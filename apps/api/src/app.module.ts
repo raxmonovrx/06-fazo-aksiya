@@ -6,6 +6,7 @@ import { CampaignModule } from './campaign/campaign.module.js';
 import { HealthController } from './health.controller.js';
 import { ParticipantsModule } from './participants/participants.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { ReceiptsModule } from './receipts/receipts.module.js';
 import { TelegramModule } from './telegram/telegram.module.js';
 
 @Module({
@@ -16,6 +17,7 @@ import { TelegramModule } from './telegram/telegram.module.js';
     TelegramModule,
     ParticipantsModule,
     BotModule,
+    ReceiptsModule,
   ],
   controllers: [HealthController],
 })

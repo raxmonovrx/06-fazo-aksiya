@@ -37,13 +37,16 @@ export async function createTestApp() {
     .useValue(bot)
     .compile();
   const app = moduleRef.createNestApplication({ logger: false });
+  app.setGlobalPrefix('api');
   await app.init();
+  await app.listen(0, '127.0.0.1');
+  const baseUrl = await app.getUrl();
 
   let updateId = 1;
   const send = async (update: Omit<Update, 'update_id'>) => {
     await bot.handleUpdate({ update_id: updateId++, ...update } as Update);
   };
-  return { app, bot, calls, send };
+  return { app, bot, calls, send, baseUrl: baseUrl.replace('[::1]', '127.0.0.1') + '/api' };
 }
 
 export function textMessage(userId: number, text: string, extra: Record<string, unknown> = {}) {
@@ -86,6 +89,21 @@ export function callback(userId: number, data: string) {
         chat: { id: userId, type: 'private', first_name: 'Test' },
         text: 'x',
       },
+    },
+  } as any;
+}
+
+export function photoMessage(userId: number, fileId = 'PHOTO_FILE_ID') {
+  return {
+    message: {
+      message_id: Math.floor(Math.random() * 1e6),
+      date: Math.floor(Date.now() / 1000),
+      chat: { id: userId, type: 'private', first_name: 'Test' },
+      from: { id: userId, is_bot: false, first_name: 'Test' },
+      photo: [
+        { file_id: 'small', file_unique_id: 's', width: 90, height: 160 },
+        { file_id: fileId, file_unique_id: 'b', width: 1080, height: 1920 },
+      ],
     },
   } as any;
 }

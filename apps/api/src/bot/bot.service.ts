@@ -147,15 +147,18 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
       return ctx.reply(T.registered, { parse_mode: 'HTML', reply_markup: this.mainMenu() });
     });
 
+    // Diqqat: grammY composer'i chaqirilgan joyida zanjirga qo'shiladi. Menyu va
+    // catch-all boshqa modullar handler'laridan KEYIN turishi uchun yangi composer.
     for (const fn of this.extraHandlers) fn(bot);
+    const menu = bot.chatType('private');
 
-    pm.hears(BTN.addReceipt, (ctx) =>
+    menu.hears(BTN.addReceipt, (ctx) =>
       this.withParticipant(ctx, () =>
         ctx.reply(T.addReceipt(isHttps()), { parse_mode: 'HTML', reply_markup: this.scanKeyboard() }),
       ),
     );
 
-    pm.hears(BTN.myCoupons, (ctx) =>
+    menu.hears(BTN.myCoupons, (ctx) =>
       this.withParticipant(ctx, async (p) => {
         const s = await this.participants.summary(p.id);
         const pending = (s.receipts.PENDING ?? 0) + (s.receipts.NEEDS_REVIEW ?? 0) + (s.receipts.NOT_FOUND ?? 0);
@@ -169,14 +172,14 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
       }),
     );
 
-    pm.hears(BTN.rules, async (ctx) => {
+    menu.hears(BTN.rules, async (ctx) => {
       const c = await this.campaigns.getActive();
       return ctx.reply(T.rulesShort(this.rulesUrl, c?.rulesText ?? ''), {
         link_preview_options: { is_disabled: true },
       });
     });
 
-    pm.hears(BTN.invite, (ctx) =>
+    menu.hears(BTN.invite, (ctx) =>
       this.withParticipant(ctx, (p) =>
         ctx.reply(T.invite(`https://t.me/${config().BOT_USERNAME}?start=ref_${p.refCode}`), {
           link_preview_options: { is_disabled: true },
@@ -184,9 +187,9 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
       ),
     );
 
-    pm.hears(BTN.contact, (ctx) => ctx.reply(T.contact(config().SUPPORT_CONTACT)));
+    menu.hears(BTN.contact, (ctx) => ctx.reply(T.contact(config().SUPPORT_CONTACT)));
 
-    pm.on('message', async (ctx) => {
+    menu.on('message', async (ctx) => {
       const p = await this.participants.findByTgId(ctx.from.id);
       if (!isRegistered(p)) return ctx.reply(T.needRegister);
       return ctx.reply(T.unknown, { reply_markup: this.mainMenu() });
