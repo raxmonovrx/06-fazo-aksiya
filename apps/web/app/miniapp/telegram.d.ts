@@ -38,6 +38,18 @@ interface TgWebApp {
     selectionChanged(): void;
   };
   BackButton: { show(): void; hide(): void; onClick(cb: () => void): void; offClick(cb: () => void): void };
+  MainButton: {
+    isVisible: boolean;
+    setParams(p: { text?: string; color?: string; text_color?: string; is_active?: boolean; is_visible?: boolean }): void;
+    show(): void;
+    hide(): void;
+    enable(): void;
+    disable(): void;
+    showProgress(leaveActive?: boolean): void;
+    hideProgress(): void;
+    onClick(cb: () => void): void;
+    offClick(cb: () => void): void;
+  };
 }
 
 interface Window {

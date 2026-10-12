@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/c
 import { z } from 'zod';
 
 import { CampaignService } from '../campaign/campaign.service.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 import { ParticipantsService } from '../participants/participants.service.js';
 import { ReceiptsService } from '../receipts/receipts.service.js';
 import { MiniappGuard, type MiniappRequest } from './miniapp.guard.js';
@@ -15,16 +16,20 @@ export class MiniappController {
     private readonly receipts: ReceiptsService,
     private readonly participants: ParticipantsService,
     private readonly campaigns: CampaignService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Get('me')
   async me(@Req() req: MiniappRequest) {
     const p = req.participant;
-    const [summary, receipts, campaign] = await Promise.all([
+    const [summary, receipts, campaign, branches] = await Promise.all([
       this.participants.summary(p.id),
       this.receipts.listForParticipant(p.id),
       this.campaigns.getActive(),
+      this.prisma.branch.findMany({ where: { isActive: true }, select: { minSum: true, couponPrice: true } }),
     ]);
+    // Qoidalar ekrani uchun: hamma filialda bir xil bo'lsa — raqam, aks holda null ("filialga qarab")
+    const same = (vals: number[]) => (vals.length && vals.every((v) => v === vals[0]) ? vals[0] : null);
     return {
       participant: { firstName: p.firstName, phone: p.phone, refCode: p.refCode },
       coupons: summary.coupons,
@@ -36,6 +41,11 @@ export class MiniappController {
         receiptWindowHours: campaign.receiptWindowHours,
         rulesText: campaign.rulesText,
       },
+      rules: {
+        couponPrice: same(branches.map((b) => Number(b.couponPrice))),
+        minSum: same(branches.map((b) => Number(b.minSum))),
+      },
+      isStaff: p.isStaff,
     };
   }
 

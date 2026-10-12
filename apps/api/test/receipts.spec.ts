@@ -91,9 +91,12 @@ describe('Chek qo\'shish', () => {
   });
 
   it('takror: o\'zi → ALREADY_YOURS, boshqasi → DUPLICATE', async () => {
-    expect((await (await post(1, qr(1))).json()).code).toBe('ALREADY_YOURS');
+    const mine = await (await post(1, qr(1))).json();
+    expect(mine.code).toBe('ALREADY_YOURS');
+    expect(mine.receipt).toMatchObject({ branchName: 'Fazo Restaurant', status: 'PENDING' });
     const other = await (await post(2, qr(1))).json();
     expect(other.code).toBe('DUPLICATE');
+    expect(other.receipt).toBeUndefined();
     expect(other.message).toContain('allaqachon qo\'shilgan');
   });
 

@@ -166,6 +166,8 @@ describe('Admin panel API + solishtirish', () => {
   it('savdo yozuvi oldin bo\'lsa — yangi chek darhol tasdiqlanadi', async () => {
     const body = await submit(1, qr(99, FM, '20261016110000'));
     expect(body.code).toBe('ACCEPTED');
+    // Mini app natija oynasi darhol yakuniy holatni ko'radi
+    expect(body.receipt).toMatchObject({ status: 'APPROVED', couponsCount: 1, amount: 120000, branchName: 'Fazo Restaurant' });
     const r = await prisma.receipt.findUniqueOrThrow({ where: { id: body.receipt.id } });
     expect(r).toMatchObject({ status: 'APPROVED', couponsCount: 1 });
   });

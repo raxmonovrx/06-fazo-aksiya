@@ -24,10 +24,20 @@ export type SubmitCode =
   | 'NO_CAMPAIGN'
   | 'RATE_LIMIT';
 
+export interface ReceiptView {
+  id: number;
+  status: Receipt['status'];
+  fiscalAt: Date | null;
+  receiptNumber: string | null;
+  branchName: string | null;
+  amount: number | null;
+  couponsCount: number;
+}
+
 export interface SubmitResult {
   code: SubmitCode;
   message: string;
-  receipt?: Pick<Receipt, 'id' | 'status' | 'fiscalAt' | 'receiptNumber'> & { branchName?: string | null };
+  receipt?: ReceiptView;
 }
 
 export interface SubmitInput {
@@ -81,7 +91,7 @@ export class ReceiptsService {
         },
       });
       await this.scanLog(input, 'QR_UNREADABLE', receipt.id);
-      return { code: 'REVIEW', message: MSG.PHOTO_UNREADABLE, receipt: this.view(receipt) };
+      return { code: 'REVIEW', message: MSG.PHOTO_UNREADABLE, receipt: await this.view(receipt.id) };
     }
 
     const parsed = parseReceiptQr(input.text);
@@ -103,7 +113,8 @@ export class ReceiptsService {
     if (existing) {
       const code = existing.participantId === participant.id ? 'ALREADY_YOURS' : 'DUPLICATE';
       await this.scanLog(input, code, existing.id);
-      return { code, message: MSG[code] };
+      // Boshqa odamning cheki haqida ma'lumot qaytarilmaydi
+      return { code, message: MSG[code], ...(code === 'ALREADY_YOURS' && { receipt: await this.view(existing.id) }) };
     }
 
     const device = await this.prisma.fiscalDevice.findUnique({
@@ -171,7 +182,8 @@ export class ReceiptsService {
       }
     }
 
-    const view = { ...this.view(receipt), branchName: device?.branch.name ?? null };
+    // Darhol solishtirish statusni o'zgartirgan bo'lishi mumkin — yangisini o'qiymiz
+    const view = await this.view(receipt.id);
     const message =
       code === 'ACCEPTED'
         ? MSG.ACCEPTED(device!.branch.name, qr.fiscalAt)
@@ -204,8 +216,18 @@ export class ReceiptsService {
     });
   }
 
-  private view(r: Receipt) {
-    return { id: r.id, status: r.status, fiscalAt: r.fiscalAt, receiptNumber: r.receiptNumber };
+  private async view(id: number): Promise<ReceiptView | undefined> {
+    const r = await this.prisma.receipt.findUnique({ where: { id }, include: { branch: { select: { name: true } } } });
+    if (!r) return undefined;
+    return {
+      id: r.id,
+      status: r.status,
+      fiscalAt: r.fiscalAt,
+      receiptNumber: r.receiptNumber,
+      branchName: r.branch?.name ?? null,
+      amount: r.amount === null ? null : Number(r.amount),
+      couponsCount: r.couponsCount,
+    };
   }
 
   private async scanLog(input: SubmitInput, result: string, receiptId?: number) {
