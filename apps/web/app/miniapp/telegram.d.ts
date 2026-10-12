@@ -25,6 +25,9 @@ interface TgWebApp {
   enableVerticalSwipes?(): void;
   // 8.0+
   lockOrientation?(): void;
+  requestFullscreen?(): void;
+  exitFullscreen?(): void;
+  isFullscreen?: boolean;
   showScanQrPopup(params: { text?: string }, cb?: (text: string) => boolean | void): void;
   closeScanQrPopup(): void;
   showAlert(message: string, cb?: () => void): void;

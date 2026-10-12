@@ -43,10 +43,17 @@ body {
   --fc-skeleton: #e3e3e8;
   --fc-tint: color-mix(in srgb, var(--button) 10%, transparent);
 
-  --safe-bottom: max(var(--tg-safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));
+  /* Safe area = qurilma (notch, status bar, home indicator) + Telegram tugmalari
+     (fullscreen'da yopish/orqaga kontent ustida). Telegram 8.0+ o'zgaruvchilari, bo'lmasa env(). */
+  --safe-top: max(calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px)), env(safe-area-inset-top, 0px));
+  --safe-bottom: max(calc(var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px)), env(safe-area-inset-bottom, 0px));
+  --safe-left: max(calc(var(--tg-safe-area-inset-left, 0px) + var(--tg-content-safe-area-inset-left, 0px)), env(safe-area-inset-left, 0px));
+  --safe-right: max(calc(var(--tg-safe-area-inset-right, 0px) + var(--tg-content-safe-area-inset-right, 0px)), env(safe-area-inset-right, 0px));
 
   min-height: 100vh;
   min-height: var(--tg-viewport-stable-height, 100vh);
+  box-sizing: border-box;
+  padding: var(--safe-top) var(--safe-right) 0 var(--safe-left);
   background: var(--sec);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Roboto, 'Segoe UI', system-ui, sans-serif;
@@ -176,7 +183,7 @@ body:has(.fc) {
 
 /* Bottom sheet */
 .fc .overlay { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; background: var(--fc-overlay); }
-.fc .sheet { width: 100%; max-width: 480px; margin: 0 auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px; padding: 8px 16px calc(max(var(--safe-bottom), 16px) + 18px); background: var(--bg); border-radius: 16px 16px 0 0; }
+.fc .sheet { width: 100%; max-width: 480px; margin: 0 auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px; padding: 8px calc(16px + var(--safe-right)) calc(max(var(--safe-bottom), 16px) + 18px) calc(16px + var(--safe-left)); background: var(--bg); border-radius: 16px 16px 0 0; }
 .fc .grabber { align-self: center; width: 36px; height: 5px; border-radius: 3px; background: var(--sep); }
 .fc .sheet-head { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
 .fc .sheet-head.waiting { padding-bottom: 24px; }
@@ -194,7 +201,7 @@ body:has(.fc) {
 .fc .spin { animation: fc-spin 0.9s linear infinite; }
 
 /* To'liq ekranli holatlar */
-.fc .full { min-height: 100vh; min-height: var(--tg-viewport-stable-height, 100vh); display: flex; flex-direction: column; background: var(--bg); }
+.fc .full { min-height: calc(100vh - var(--safe-top)); min-height: calc(var(--tg-viewport-stable-height, 100vh) - var(--safe-top)); display: flex; flex-direction: column; background: var(--bg); }
 .fc .full-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 16px 24px; text-align: center; }
 .fc .full-bottom { padding: 8px 16px calc(max(var(--safe-bottom), 16px) + 18px); border-top: 0.5px solid var(--sep); background: var(--bg); }
 

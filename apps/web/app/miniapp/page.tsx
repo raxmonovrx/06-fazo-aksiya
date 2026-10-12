@@ -44,6 +44,7 @@ const BOT = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'FazoClub_bot';
 const BRAND = '#C8102E';
 const PENDING = new Set(['PENDING', 'NEEDS_REVIEW', 'NOT_FOUND']);
 const NO_SCANNER = new Set(['tdesktop', 'macos', 'web', 'weba', 'webk', 'unknown']);
+const MOBILE = new Set(['ios', 'android', 'android_x']);
 
 const BADGE: Record<string, { label: string; tone: 'warn' | 'ok' | 'gray' | 'err' }> = {
   PENDING: { label: 'Tekshirilmoqda', tone: 'warn' },
@@ -95,7 +96,12 @@ export default function MiniApp() {
     w.expand();
     // Pastga tortganda ilova yopilib ketmasin (Bot API 7.7+)
     if (w.isVersionAtLeast('7.7')) w.disableVerticalSwipes?.();
-    if (w.isVersionAtLeast('8.0')) w.lockOrientation?.();
+    if (w.isVersionAtLeast('8.0')) {
+      w.lockOrientation?.();
+      // Fullscreen — faqat telefonda. Telegram tugmalari kontent ustida chiqadi,
+      // shuning uchun joy --tg-safe-area-inset-* va --tg-content-safe-area-inset-* bilan qoldiriladi (globals.css)
+      if (MOBILE.has(w.platform) && !w.isFullscreen) w.requestFullscreen?.();
+    }
     if (w.isVersionAtLeast('6.1')) {
       w.setHeaderColor('secondary_bg_color');
       w.setBackgroundColor('secondary_bg_color');
