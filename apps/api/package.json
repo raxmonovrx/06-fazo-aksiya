@@ -15,6 +15,7 @@
     "db:seed": "node --env-file-if-exists=../../.env dist/seed.js"
   },
   "dependencies": {
+    "@grammyjs/auto-retry": "^2.0.2",
     "@nestjs/common": "^12",
     "@nestjs/core": "^12",
     "@nestjs/platform-express": "^12",

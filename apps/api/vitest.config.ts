@@ -7,5 +7,8 @@ export default defineConfig({
   test: {
     globals: true,
     include: ['src/**/*.spec.ts', 'test/**/*.spec.ts'],
+    setupFiles: ['test/setup-env.ts'],
+    // Integratsion testlar bitta bazani ishlatadi
+    fileParallelism: false,
   },
 });
