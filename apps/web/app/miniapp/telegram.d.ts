@@ -56,5 +56,8 @@ interface TgWebApp {
 }
 
 interface Window {
-  Telegram?: { WebApp: TgWebApp };
+  Telegram?: {
+    WebApp: TgWebApp;
+    WebView?: { postEvent(event: string, callback: unknown, params?: Record<string, unknown>): void };
+  };
 }

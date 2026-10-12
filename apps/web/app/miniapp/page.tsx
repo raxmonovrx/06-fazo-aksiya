@@ -43,6 +43,8 @@ interface Sheet {
   tone: Tone;
   title: string;
   body: string;
+  /** MainButton drawer ochiqligida: true — "Boshqa chek" (skaner), aks holda "Yaxshi" (yopish) */
+  rescan?: boolean;
 }
 
 const BOT = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'FazoClub_bot';
@@ -50,6 +52,7 @@ const BRAND = '#C8102E';
 const PENDING = new Set(['PENDING', 'NEEDS_REVIEW', 'NOT_FOUND']);
 const NO_SCANNER = new Set(['tdesktop', 'macos', 'web', 'weba', 'webk', 'unknown']);
 const MOBILE = new Set(['ios', 'android', 'android_x']);
+const ANDROID = new Set(['android', 'android_x']);
 
 const sum = (n: number | string) => Math.round(Number(n)).toLocaleString('ru-RU').replace(/ /g, ' ');
 
@@ -166,8 +169,8 @@ export default function MiniApp() {
     });
   }, [tg, busy, canScan, submit]);
 
-  // MainButton — har doim "QR'ni skanerlash". Matnni almashtirmaymiz: Telegram Android
-  // yangi matnni bir qadam kechikib ko'rsatadi. Drawer surib / fonni bosib / Orqaga bilan yopiladi.
+  // MainButton — ilovadagi yagona asosiy tugma (o'lcham/rang 1:1 native). Drawer ochiqligida
+  // uning matni va harakati almashadi: "Tushunarli" / "Yaxshi" / "Boshqa chek".
   useEffect(() => {
     if (!tg) return;
     const mb = tg.MainButton;
@@ -175,13 +178,37 @@ export default function MiniApp() {
       mb.hide();
       return;
     }
-    mb.setParams({ text: "QR'ni skanerlash", color: BRAND, text_color: '#FFFFFF', is_active: !busy });
+    const close = () => setSheet(null);
+    let text = "QR'ni skanerlash";
+    let action: () => void = scan;
+    if (sheet === 'rules') [text, action] = ['Tushunarli', close];
+    else if (sheet) [text, action] = sheet.rescan ? ['Boshqa chek', scan] : ['Yaxshi', close];
+    mb.setParams({ text, color: BRAND, text_color: '#FFFFFF', is_active: !busy });
     mb.show();
     if (busy) mb.showProgress(false);
     else mb.hideProgress();
-    mb.onClick(scan);
-    return () => mb.offClick(scan);
-  }, [tg, state, busy, scan]);
+    mb.onClick(action);
+    // Telegram Android tugmani bir qadam kechikib chizadi (oldingi holatni ko'rsatadi) —
+    // xuddi shu holatni qisqa pauzadan keyin yana yuboramiz, shunda to'g'ri matn chiziladi
+    let repost: ReturnType<typeof setTimeout> | undefined;
+    if (ANDROID.has(tg.platform)) {
+      repost = setTimeout(() => {
+        window.Telegram?.WebView?.postEvent('web_app_setup_main_button', false, {
+          is_visible: true,
+          is_active: !busy,
+          is_progress_visible: busy,
+          text,
+          color: BRAND.toLowerCase(),
+          text_color: '#ffffff',
+          has_shine_effect: false,
+        });
+      }, 60);
+    }
+    return () => {
+      clearTimeout(repost);
+      mb.offClick(action);
+    };
+  }, [tg, state, sheet, busy, scan]);
 
   // "Chek rasmini botga yuborish": bot chatga yo'riqnoma, keyin mini app yopiladi (chatga qaytadi)
   const photoToBot = useCallback(async () => {
@@ -316,15 +343,15 @@ function sheetFor(res: SubmitResult, hours: number): Sheet {
     case 'ALREADY_YOURS':
       return { tone: 'warn', title: "Bu chek qo'shilgan", body: 'Bitta chek faqat bir marta hisoblanadi.' };
     case 'DUPLICATE':
-      return { tone: 'err', title: "Bu chek allaqachon qo'shilgan", body: 'Bitta chek faqat bir marta hisoblanadi.' };
+      return { tone: 'err', title: "Bu chek allaqachon qo'shilgan", body: 'Bitta chek faqat bir marta hisoblanadi.', rescan: true };
     case 'WINDOW_EXPIRED':
-      return { tone: 'err', title: 'Chek eskirgan', body: `Faqat oxirgi ${hours} soatdagi cheklar qabul qilinadi.` };
+      return { tone: 'err', title: 'Chek eskirgan', body: `Faqat oxirgi ${hours} soatdagi cheklar qabul qilinadi.`, rescan: true };
     case 'INVALID_QR':
-      return { tone: 'err', title: 'Fiskal chek emas', body: 'Chek pastidagi soliq QR kodini skanerlang.' };
+      return { tone: 'err', title: 'Fiskal chek emas', body: 'Chek pastidagi soliq QR kodini skanerlang.', rescan: true };
     case 'RATE_LIMIT':
       return { tone: 'warn', title: "Juda ko'p urinish", body: "Birozdan keyin qayta urinib ko'ring." };
     case 'OFFLINE':
-      return { tone: 'err', title: "Internet yo'q", body: res.message };
+      return { tone: 'err', title: "Internet yo'q", body: res.message, rescan: true };
     default:
       return { tone: 'err', title: 'Chek qabul qilinmadi', body: res.message };
   }
