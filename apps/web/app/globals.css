@@ -108,9 +108,11 @@ body:has(.fc) {
 .fc .row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 9px 0; }
 .fc .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; height: 100%; min-height: 160px; text-align: center; }
 
-/* Pastdan chiqadigan oyna */
-.fc .overlay { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; background: var(--overlay); }
-.fc .sheet { width: 100%; max-width: 480px; margin: 0 auto; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 24px calc(var(--safe-right) + 20px) calc(max(var(--safe-bottom), 12px) + 12px) calc(var(--safe-left) + 20px); background: var(--bg); border-radius: 16px 16px 0 0; text-align: center; }
+/* Drawer (Vaul) — animatsiya va surib yopishni kutubxona boshqaradi */
+.fc .overlay { position: fixed; inset: 0; z-index: 30; background: var(--overlay); }
+.fc .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-width: 480px; margin: 0 auto; outline: none; background: var(--bg); border-radius: 16px 16px 0 0; }
+.fc .handle { margin-top: 8px; background: var(--line) !important; }
+.fc .sheet-body { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px calc(var(--safe-right) + 20px) calc(max(var(--safe-bottom), 12px) + 12px) calc(var(--safe-left) + 20px); text-align: center; }
 .fc .mark { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 26px; margin-bottom: 4px; }
 .fc .tone-ok { color: var(--ok); background: var(--ok-bg); }
 .fc .tone-warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
@@ -120,7 +122,7 @@ body:has(.fc) {
 .fc .btn-text { height: 40px; padding: 0 16px; color: var(--link); font-size: 16px; font-weight: 600; }
 .fc .inline-link { color: var(--link); }
 .fc .rules { align-self: stretch; padding-left: 22px; text-align: left; font-size: 15px; line-height: 21px; display: flex; flex-direction: column; gap: 8px; }
-.fc .sheet > .t-foot { align-self: stretch; text-align: left; margin-top: 4px; }
+.fc .sheet-body > .t-foot { align-self: stretch; text-align: left; margin-top: 4px; }
 
 /* To'liq ekranli holatlar */
 .fc .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding-bottom: var(--safe-bottom); text-align: center; }

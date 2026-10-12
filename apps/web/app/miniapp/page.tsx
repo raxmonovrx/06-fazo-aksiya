@@ -5,9 +5,10 @@
  *   yuqorida: kuponlar soni + "Qoidalar"
  *   o'rtada:  cheklar ro'yxati (faqat ro'yxat ichida suriladi)
  *   pastda:   Telegram MainButton — "QR'ni skanerlash"
- * Qoidalar va skaner natijasi — pastdan chiqadigan oyna. Ranglar Telegram mavzusidan.
+ * Qoidalar va skaner natijasi — Vaul drawer (surib yopiladi). Ranglar Telegram mavzusidan.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Drawer } from 'vaul';
 
 import { fmtShort } from '@/lib/format';
 
@@ -61,6 +62,12 @@ export default function MiniApp() {
   const [me, setMe] = useState<Me | null>(null);
   const [busy, setBusy] = useState(false);
   const [sheet, setSheet] = useState<Sheet | 'rules' | null>(null);
+  // Drawer yopilish animatsiyasi davomida kontent yo'qolmasin — oxirgisini ushlab turamiz
+  const [shown, setShown] = useState<Sheet | 'rules' | null>(null);
+  useEffect(() => {
+    if (sheet) setShown(sheet);
+  }, [sheet]);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const api = useCallback(
     (path: string, init?: RequestInit) =>
@@ -191,7 +198,7 @@ export default function MiniApp() {
 
   // ── Holatlar ───────────────────────────────────────────────────────────
   const root = (children: React.ReactNode) => (
-    <div className="fc" data-scheme={scheme}>
+    <div className="fc" data-scheme={scheme} ref={rootRef}>
       {children}
     </div>
   );
@@ -243,14 +250,19 @@ export default function MiniApp() {
         )}
       </div>
 
-      {sheet === 'rules' && <RulesSheet hours={hours} rules={me.rules} onClose={() => setSheet(null)} onBot={toBot} />}
-      {sheet && sheet !== 'rules' && (
-        <SheetView
-          sheet={sheet}
-          onPrimary={() => (sheet.rescan ? scan() : setSheet(null))}
-          onClose={() => setSheet(null)}
-        />
-      )}
+      <Drawer.Root open={sheet !== null} onOpenChange={(open) => !open && setSheet(null)}>
+        <Drawer.Portal container={rootRef.current}>
+          <Drawer.Overlay className="overlay" />
+          <Drawer.Content className="sheet" aria-describedby={undefined}>
+            <Drawer.Handle className="handle" />
+            {shown === 'rules' ? (
+              <RulesSheet hours={hours} rules={me.rules} onClose={() => setSheet(null)} onBot={toBot} />
+            ) : shown ? (
+              <SheetView sheet={shown} onPrimary={() => (shown.rescan ? scan() : setSheet(null))} onClose={() => setSheet(null)} />
+            ) : null}
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
     </>,
   );
 }
@@ -312,25 +324,15 @@ function sheetFor(res: SubmitResult, hours: number): Sheet {
   }
 }
 
-function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="overlay" onClick={onClose}>
-      <section role="dialog" className="sheet" onClick={(e) => e.stopPropagation()}>
-        {children}
-      </section>
-    </div>
-  );
-}
-
 function SheetView({ sheet, onPrimary, onClose }: { sheet: Sheet; onPrimary: () => void; onClose: () => void }) {
   return (
-    <Overlay onClose={onClose}>
+    <div className="sheet-body">
       <div className={`mark tone-${sheet.tone}`}>{sheet.tone === 'ok' ? <IconCheck /> : sheet.tone === 'warn' ? <IconClock /> : <IconX />}</div>
-      <h2 className="t-title">{sheet.title}</h2>
+      <Drawer.Title className="t-title">{sheet.title}</Drawer.Title>
       {sheet.body && <p className="t-sub c-sub">{sheet.body}</p>}
       <button className="btn" onClick={onPrimary}>{sheet.primary}</button>
       {sheet.rescan && <button className="btn-text" onClick={onClose}>Yopish</button>}
-    </Overlay>
+    </div>
   );
 }
 
@@ -339,8 +341,8 @@ function RulesSheet({ hours, rules, onClose, onBot }: { hours: number; rules: Me
     ? `Har ${sum(rules.couponPrice)} so'm uchun 1 kupon${rules.minSum && rules.minSum > rules.couponPrice ? ` (chek kamida ${sum(rules.minSum)} so'm)` : ''}.`
     : "Kupon soni chek summasiga bog'liq.";
   return (
-    <Overlay onClose={onClose}>
-      <h2 className="t-title">Qoidalar</h2>
+    <div className="sheet-body">
+      <Drawer.Title className="t-title">Qoidalar</Drawer.Title>
       <ol className="rules">
         <li>Fazo filialida olingan chekdagi QR kodni skanerlang.</li>
         <li>Chekni {hours} soat ichida qo&apos;shing.</li>
@@ -352,7 +354,7 @@ function RulesSheet({ hours, rules, onClose, onBot }: { hours: number; rules: Me
         <a className="c-link" href="/rules" target="_blank">To&apos;liq qoidalar</a>
       </p>
       <button className="btn" onClick={onClose}>Tushunarli</button>
-    </Overlay>
+    </div>
   );
 }
 
