@@ -97,6 +97,8 @@ export default function MiniApp() {
     w.ready();
     w.expand();
     if (w.isVersionAtLeast('7.7')) w.disableVerticalSwipes?.(); // pastga tortib yopilmasin
+    // X bosilganda Telegram "Yopilsinmi?" deb so'raydi (6.2+)
+    if (w.isVersionAtLeast('6.2')) w.enableClosingConfirmation();
     if (w.isVersionAtLeast('8.0')) {
       w.lockOrientation?.();
       if (MOBILE.has(w.platform) && !w.isFullscreen) w.requestFullscreen?.();
@@ -190,11 +192,7 @@ export default function MiniApp() {
     return () => tg.BackButton.offClick(back);
   }, [tg, sheet]);
 
-  useEffect(() => {
-    if (!tg?.isVersionAtLeast('6.2')) return;
-    if (busy) tg.enableClosingConfirmation();
-    else tg.disableClosingConfirmation();
-  }, [tg, busy]);
+
 
   // ── Holatlar ───────────────────────────────────────────────────────────
   const root = (children: React.ReactNode) => (
