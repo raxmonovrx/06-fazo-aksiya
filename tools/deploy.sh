@@ -15,7 +15,13 @@ fi
 SHA="$(git rev-parse --short HEAD)"
 echo "→ $SHA ni $HOST:$DIR ga yuboryapman"
 
-ssh "$HOST" "mkdir -p $DIR && test -f $DIR/.env" || { echo "❌ $HOST:$DIR/.env yo'q" >&2; exit 1; }
+# Tarmoq uzilishi va .env yo'qligini farqlaymiz (ssh o'zi 255 qaytaradi)
+set +e
+ssh -o ConnectTimeout=15 "$HOST" "mkdir -p $DIR && test -f $DIR/.env"
+rc=$?
+set -e
+if [ $rc -eq 255 ]; then echo "❌ $HOST ga ulanib bo'lmadi (tarmoq/SSH) — qayta urinib ko'ring" >&2; exit 1; fi
+if [ $rc -ne 0 ]; then echo "❌ $HOST:$DIR/.env yo'q" >&2; exit 1; fi
 
 rsync -az --delete \
   --exclude node_modules --exclude .next --exclude dist --exclude storage \
