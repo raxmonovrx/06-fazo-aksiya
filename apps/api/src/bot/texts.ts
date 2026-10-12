@@ -3,8 +3,7 @@
 export const BTN = {
   sendPhone: "📱 Raqamni yuborish",
   agree: '✅ Roziman',
-  addReceipt: "🧾 Chek qo'shish",
-  invite: "👥 Do'stni taklif qilish",
+  invite: '👥 Taklif qilish',
   contact: '☎️ Aloqa',
 } as const;
 
@@ -30,9 +29,7 @@ export const T = {
 
   home: (name?: string | null) =>
     `${name ? `${esc(name)}, ` : ''}Fazo Club'ga xush kelibsiz! 🎉\n\n` +
-    `Fazo filiallaridagi fiskal chek QR kodini skanerlang va kupon oling. ` +
-    `Har oy sovg'alar, yil oxirida avtomobil o'ynaladi.\n\n` +
-    `🧾 Chek qo'shish — pastdagi tugma orqali. Skaner ishlamasa, chek <b>rasmini</b> shu yerga yuboring.`,
+    `Chek QR kodini skanerlang va kupon oling: har oy sovg'alar, yil oxirida avtomobil 🚗`,
 
   inviteShare: "Fazo'da ovqatlaning, chekdagi QR kodni skanerlang — oylik sovg'alar va yil oxirida avtomobil o'yini 🚗",
 

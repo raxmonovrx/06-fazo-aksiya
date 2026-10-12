@@ -49,7 +49,7 @@ describe('Bot: ro\'yxatdan o\'tish', () => {
     expect(lastText()?.text).toContain("Fazo Club'ga xush kelibsiz");
     // Doimiy klaviatura yo'q — faqat inline tugmalar; eski klaviatura olib tashlanadi
     const buttons = lastText()?.reply_markup.inline_keyboard.flat();
-    expect(buttons.map((b: any) => b.text)).toEqual(["👥 Do'stni taklif qilish", '☎️ Aloqa']);
+    expect(buttons.map((b: any) => b.text)).toEqual(['👥 Taklif qilish', '☎️ Aloqa']);
     expect(t.calls.some((c) => c.method === 'sendMessage' && c.payload.reply_markup?.remove_keyboard)).toBe(true);
     expect(t.calls.some((c) => c.method === 'deleteMessage')).toBe(true);
 

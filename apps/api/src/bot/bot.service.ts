@@ -33,8 +33,8 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
 
   /** Bosh xabar ostidagi inline tugmalar (doimiy klaviatura yo'q). */
   homeKeyboard(p: Participant) {
+    // "Chek qo'shish" — pastdagi menyu tugmasida doim turadi, bu yerda takrorlanmaydi
     const kb = new InlineKeyboard();
-    if (isHttps()) kb.webApp(BTN.addReceipt, this.miniAppUrl).row();
     const ref = `https://t.me/${config().BOT_USERNAME}?start=ref_${p.refCode}`;
     kb.url(BTN.invite, `https://t.me/share/url?url=${encodeURIComponent(ref)}&text=${encodeURIComponent(T.inviteShare)}`);
     kb.text(BTN.contact, 'contact');
