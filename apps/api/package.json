@@ -1,0 +1,51 @@
+{
+  "name": "@fazo/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "start": "node dist/main.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "node --env-file-if-exists=../../.env dist/seed.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "^12",
+    "@nestjs/core": "^12",
+    "@nestjs/platform-express": "^12",
+    "@nestjs/schedule": "^12",
+    "@prisma/client": "^6.19",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "exceljs": "^4.4.0",
+    "grammy": "^1.46.0",
+    "jsonwebtoken": "^9.0.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "sharp": "^0.35.5",
+    "zod": "^4.6.6",
+    "zxing-wasm": "^3.1.5"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^12",
+    "@nestjs/schematics": "^12",
+    "@nestjs/testing": "^12",
+    "@swc/core": "^1.16.18",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24",
+    "@types/qrcode": "^1.5.6",
+    "prisma": "^6.19",
+    "qrcode": "^1.5.4",
+    "typescript": "^6",
+    "unplugin-swc": "^2.0.0",
+    "vitest": "^4"
+  }
+}

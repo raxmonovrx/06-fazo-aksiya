@@ -1,0 +1,19 @@
+{
+  "name": "fazo-club",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.9+sha512.68046141893c66fad01c079231128e9afb89ef87e2691d69e4d40eee228988295fd4682181bae55b58418c3a253bde65a505ec7c5f9403ece5cc3cd37dcf2531",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @fazo/api dev",
+    "dev:web": "pnpm --filter @fazo/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "db:up": "docker compose -f docker-compose.dev.yml up -d",
+    "db:migrate": "pnpm --filter @fazo/api db:migrate",
+    "db:seed": "pnpm --filter @fazo/api db:seed"
+  }
+}
