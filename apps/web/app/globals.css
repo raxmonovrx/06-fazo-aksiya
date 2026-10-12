@@ -12,49 +12,38 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ── Mini app (dizayn: Fazo Club canvas, 1B) ─────────────────────────────
-   Telegram ranglari themeParams'dan (--tg-theme-*), qiymatlar — standart mavzu namunasi.
-   Ilovaning o'z tokenlari --fc-*. 390 kenglik, 8pt grid, tizim shrifti, animatsiyasiz. */
+/* ── Mini app: bitta kompakt ekran ─────────────────────────────────────────
+   Sahifa scroll bo'lmaydi — faqat cheklar ro'yxati ichida suriladi.
+   Ranglar Telegram mavzusidan (--tg-theme-*), brend — bitta qizil. */
 .fc {
   --bg: var(--tg-theme-bg-color, #ffffff);
-  --sec: var(--tg-theme-secondary-bg-color, #efeff4);
-  --section: var(--tg-theme-section-bg-color, var(--bg));
   --text: var(--tg-theme-text-color, #000000);
-  --sub: var(--tg-theme-subtitle-text-color, #6d6d72);
-  --header: var(--tg-theme-section-header-text-color, var(--sub));
+  --sub: var(--tg-theme-subtitle-text-color, var(--tg-theme-hint-color, #6d6d72));
   --hint: var(--tg-theme-hint-color, #8e8e93);
   --link: var(--tg-theme-link-color, #2481cc);
-  --button: var(--tg-theme-button-color, #2481cc);
-  --button-text: var(--tg-theme-button-text-color, #ffffff);
-  --sep: var(--tg-theme-section-separator-color, #c8c7cc);
-  --sec2: var(--sec);
+  --line: var(--tg-theme-section-separator-color, color-mix(in srgb, var(--hint) 30%, transparent));
+  --chip: color-mix(in srgb, var(--hint) 14%, transparent);
+  --brand: #c8102e;
+  --warn: #b25e00;
+  --err: #c4001a;
+  --ok-bg: #e2f3e6;
+  --ok: #1f7a35;
+  --overlay: rgba(0, 0, 0, 0.4);
 
-  --fc-brand: #c8102e;
-  --fc-brand-text: #c8102e;
-  --fc-success-fg: #1f7a35;
-  --fc-success-bg: #e2f3e6;
-  --fc-warning-fg: #a35200;
-  --fc-warning-bg: #fff0dc;
-  --fc-neutral-fg: #5c5c61;
-  --fc-neutral-bg: #e9e9ee;
-  --fc-error-fg: #c4001a;
-  --fc-error-bg: #fde6e9;
-  --fc-overlay: rgba(0, 0, 0, 0.4);
-  --fc-skeleton: #e3e3e8;
-  --fc-tint: color-mix(in srgb, var(--button) 10%, transparent);
-
-  /* Safe area = qurilma (notch, status bar, home indicator) + Telegram tugmalari
-     (fullscreen'da yopish/orqaga kontent ustida). Telegram 8.0+ o'zgaruvchilari, bo'lmasa env(). */
+  /* Safe area: qurilma + Telegram tugmalari (fullscreen) */
   --safe-top: max(calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px)), env(safe-area-inset-top, 0px));
   --safe-bottom: max(calc(var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px)), env(safe-area-inset-bottom, 0px));
   --safe-left: max(calc(var(--tg-safe-area-inset-left, 0px) + var(--tg-content-safe-area-inset-left, 0px)), env(safe-area-inset-left, 0px));
   --safe-right: max(calc(var(--tg-safe-area-inset-right, 0px) + var(--tg-content-safe-area-inset-right, 0px)), env(safe-area-inset-right, 0px));
 
-  min-height: 100vh;
-  min-height: var(--tg-viewport-stable-height, 100vh);
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  height: var(--tg-viewport-height, 100dvh);
+  overflow: hidden;
   box-sizing: border-box;
-  padding: var(--safe-top) var(--safe-right) 0 var(--safe-left);
-  background: var(--sec);
+  padding: calc(var(--safe-top) + 12px) calc(var(--safe-right) + 20px) 0 calc(var(--safe-left) + 20px);
+  background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Roboto, 'Segoe UI', system-ui, sans-serif;
   -webkit-user-select: none;
@@ -62,27 +51,24 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .fc[data-scheme='dark'] {
-  --sec2: #2c2c2e;
-  --fc-brand-text: #f0485c;
-  --fc-success-fg: #30d158;
-  --fc-success-bg: rgba(48, 209, 88, 0.16);
-  --fc-warning-fg: #ff9f0a;
-  --fc-warning-bg: rgba(255, 159, 10, 0.16);
-  --fc-neutral-fg: #aeaeb2;
-  --fc-neutral-bg: #2c2c2e;
-  --fc-error-fg: #ff6961;
-  --fc-error-bg: rgba(255, 69, 58, 0.18);
-  --fc-overlay: rgba(0, 0, 0, 0.6);
-  --fc-skeleton: #2c2c2e;
-  --fc-tint: color-mix(in srgb, var(--button) 16%, transparent);
-}
-.fc-plain {
-  background: var(--bg);
+  --brand: #f0485c;
+  --warn: #ff9f0a;
+  --err: #ff6961;
+  --ok-bg: rgba(48, 209, 88, 0.16);
+  --ok: #30d158;
+  --overlay: rgba(0, 0, 0, 0.6);
 }
 html:has(.fc),
 body:has(.fc) {
-  background: var(--tg-theme-secondary-bg-color, #efeff4);
+  background: var(--tg-theme-bg-color, #ffffff);
+  overflow: hidden;
   overscroll-behavior: none;
+}
+.fc p,
+.fc h1,
+.fc h2,
+.fc ol {
+  margin: 0;
 }
 .fc button {
   font: inherit;
@@ -90,7 +76,6 @@ body:has(.fc) {
   background: none;
   border: 0;
   padding: 0;
-  text-align: inherit;
   cursor: pointer;
   touch-action: manipulation;
 }
@@ -98,121 +83,48 @@ body:has(.fc) {
   text-decoration: none;
 }
 
-/* Tipografika */
-.fc .t-display { font-family: ui-rounded, 'SF Pro Rounded', -apple-system, system-ui, sans-serif; font-size: 64px; line-height: 72px; font-weight: 700; letter-spacing: -0.03em; }
-.fc .t-title1 { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.01em; }
-.fc .t-title { font-size: 22px; line-height: 28px; font-weight: 600; }
-.fc .t-body { font-size: 17px; line-height: 22px; font-weight: 400; }
-.fc .t-body-sb { font-size: 17px; line-height: 22px; font-weight: 600; }
-.fc .t-step { font-size: 16px; line-height: 21px; font-weight: 600; }
-.fc .t-step-sub { font-size: 14px; line-height: 19px; }
+.fc .t-title { font-size: 22px; line-height: 28px; font-weight: 700; }
+.fc .t-body { font-size: 16px; line-height: 21px; }
+.fc .t-body-sb { font-size: 16px; line-height: 21px; font-weight: 600; }
 .fc .t-sub { font-size: 15px; line-height: 20px; }
-.fc .t-sub-sb { font-size: 15px; line-height: 20px; font-weight: 600; }
-.fc .t-foot { font-size: 13px; line-height: 18px; }
-.fc .t-caps,
-.fc .t-caps-sb { font-size: 13px; line-height: 18px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.02em; }
-.fc .t-caps-sb { font-weight: 600; }
-
-/* Ranglar */
-.fc .c-text { color: var(--text); }
+.fc .t-foot { font-size: 13px; line-height: 17px; }
 .fc .c-sub { color: var(--sub); }
-.fc .c-header { color: var(--header); }
-.fc .c-hint { color: var(--hint); }
 .fc .c-link { color: var(--link); }
-.fc .c-brand { color: var(--fc-brand-text); }
-.fc .c-err { color: var(--fc-error-fg); }
-
-/* Layout */
-.fc .screen { display: flex; flex-direction: column; gap: 24px; padding: 16px 16px calc(16px + var(--safe-bottom)); }
-.fc .screen-rules { padding-top: 24px; }
-.fc .stack-4 { display: flex; flex-direction: column; gap: 4px; }
-.fc .stack-8 { display: flex; flex-direction: column; gap: 8px; }
-.fc .px-16 { padding-left: 16px; padding-right: 16px; }
-.fc .mx-16 { margin-left: 16px; }
-.fc .grow { flex: 1; min-width: 0; }
+.fc .c-brand { color: var(--brand); }
+.fc .c-warn { color: var(--warn); }
+.fc .c-err { color: var(--err); }
 .fc .ellipsis { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.fc .section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.fc .with-icon { display: flex; align-items: center; gap: 6px; }
-.fc .chev { display: inline-flex; }
-.fc .inline-link { display: inline; color: var(--link); }
 
-/* Karta va ro'yxat */
-.fc .card { display: block; width: 100%; background: var(--section); border-radius: 12px; overflow: hidden; }
-.fc .sep-inset { height: 0.5px; margin-left: 16px; background: var(--sep); }
-.fc .list { margin: 0; padding: 0; list-style: none; }
-.fc .row { padding-left: 16px; }
-.fc .row + .row .row-inner { border-top: 0.5px solid var(--sep); }
-.fc .row-inner { display: flex; flex-direction: column; gap: 2px; padding: 12px 16px 12px 0; }
-.fc .row-line { display: flex; align-items: center; gap: 8px; }
-.fc .badge { display: inline-flex; align-items: center; flex: none; height: 24px; padding: 0 8px; border-radius: 12px; font-size: 13px; line-height: 18px; font-weight: 600; }
-.fc .badge-ok { color: var(--fc-success-fg); background: var(--fc-success-bg); }
-.fc .badge-warn { color: var(--fc-warning-fg); background: var(--fc-warning-bg); }
-.fc .badge-gray { color: var(--fc-neutral-fg); background: var(--fc-neutral-bg); }
-.fc .badge-err { color: var(--fc-error-fg); background: var(--fc-error-bg); }
-.fc .nav-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; padding: 0 16px; }
-.fc button.card.nav-row { gap: 12px; }
-.fc .empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 24px; text-align: center; }
+/* Yuqori qism */
+.fc .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 20px; }
+.fc .count { font-size: 17px; line-height: 22px; font-weight: 600; }
+.fc .count-n { font-size: 40px; line-height: 44px; font-weight: 800; letter-spacing: -0.02em; color: var(--brand); margin-right: 2px; }
+.fc .btn-chip { flex: none; margin-top: 6px; height: 32px; padding: 0 14px; border-radius: 16px; background: var(--chip); font-size: 14px; font-weight: 600; }
 
-/* Kupon kartasi */
-.fc .coupon-card { text-align: left; }
-.fc .coupon-top { display: flex; flex-direction: column; gap: 4px; padding: 16px 16px 12px; }
-.fc .coupon-value { display: flex; align-items: baseline; gap: 8px; }
-.fc .coupon-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px 16px; }
-.fc .coupon-stats > div { display: flex; flex-direction: column; gap: 2px; }
-.fc .coupon-stats .stat-right { padding-left: 16px; border-left: 0.5px solid var(--sep); }
+/* Ro'yxat — sahifa emas, faqat shu suriladi */
+.fc .list-title { padding: 0 0 4px; font-size: 13px; line-height: 17px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: 0.03em; }
+.fc .list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-bottom: calc(var(--safe-bottom) + 12px); margin: 0 -20px; padding-left: 20px; padding-right: 20px; }
+.fc .row { display: flex; align-items: center; gap: 12px; min-height: 60px; border-bottom: 0.5px solid var(--line); }
+.fc .row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 9px 0; }
+.fc .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; height: 100%; min-height: 160px; text-align: center; }
 
-/* Qoidalar */
-.fc .step { display: flex; gap: 12px; padding-left: 16px; }
-.fc .step-n { flex: none; margin-top: 12px; width: 28px; height: 28px; border-radius: 14px; background: var(--fc-tint); color: var(--link); font-size: 15px; line-height: 28px; font-weight: 600; text-align: center; }
-.fc .step-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 12px 16px 12px 0; }
-.fc .step + .step .step-body { border-top: 0.5px solid var(--sep); }
-.fc .prize { display: flex; align-items: center; gap: 12px; padding-left: 16px; }
-.fc .prize-icon { flex: none; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 7px; background: var(--fc-neutral-bg); color: var(--fc-neutral-fg); }
-.fc .prize-body { flex: 1; min-height: 44px; padding-right: 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.fc .prize + .prize .prize-body { border-top: 0.5px solid var(--sep); }
-
-/* Tugmalar */
-.fc .btn { display: flex; align-items: center; justify-content: center; width: 100%; height: 48px; border-radius: 12px; font-size: 17px; line-height: 22px; font-weight: 600; text-align: center; }
-.fc .btn-primary { background: var(--fc-brand); color: #ffffff; }
-.fc .btn-secondary { background: var(--fc-tint); color: var(--link); }
-.fc .btn-pill { margin-top: 8px; height: 44px; padding: 0 24px; border-radius: 22px; background: var(--fc-tint); color: var(--link); font-size: 17px; line-height: 22px; font-weight: 600; }
-.fc .btn:active,
-.fc .btn-pill:active,
-.fc .nav-row:active,
-.fc .coupon-card:active { opacity: 0.7; }
-
-/* Bottom sheet */
-.fc .overlay { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; background: var(--fc-overlay); }
-.fc .sheet { width: 100%; max-width: 480px; margin: 0 auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px; padding: 8px calc(16px + var(--safe-right)) calc(max(var(--safe-bottom), 16px) + 18px) calc(16px + var(--safe-left)); background: var(--bg); border-radius: 16px 16px 0 0; }
-.fc .grabber { align-self: center; width: 36px; height: 5px; border-radius: 3px; background: var(--sep); }
-.fc .sheet-head { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
-.fc .sheet-head.waiting { padding-bottom: 24px; }
-.fc .status-icon { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 32px; }
-.fc .tone-ok { color: var(--fc-success-fg); background: var(--fc-success-bg); }
-.fc .tone-warn { color: var(--fc-warning-fg); background: var(--fc-warning-bg); }
-.fc .tone-info,
-.fc .tone-gray { color: var(--fc-neutral-fg); background: var(--fc-neutral-bg); }
-.fc .tone-err { color: var(--fc-error-fg); background: var(--fc-error-bg); }
-.fc .details { background: var(--sec2); border-radius: 12px; overflow: hidden; }
-.fc .detail-row { padding-left: 16px; }
-.fc .detail-row + .detail-row .detail-inner { border-top: 0.5px solid var(--sep); }
-.fc .detail-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; padding-right: 16px; }
-.fc .detail-inner > :last-child { text-align: right; }
-.fc .spin { animation: fc-spin 0.9s linear infinite; }
+/* Pastdan chiqadigan oyna */
+.fc .overlay { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; background: var(--overlay); }
+.fc .sheet { width: 100%; max-width: 480px; margin: 0 auto; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 24px calc(var(--safe-right) + 20px) calc(max(var(--safe-bottom), 12px) + 12px) calc(var(--safe-left) + 20px); background: var(--bg); border-radius: 16px 16px 0 0; text-align: center; }
+.fc .mark { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 26px; margin-bottom: 4px; }
+.fc .tone-ok { color: var(--ok); background: var(--ok-bg); }
+.fc .tone-warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
+.fc .tone-err { color: var(--err); background: color-mix(in srgb, var(--err) 14%, transparent); }
+.fc .btn { width: 100%; height: 50px; margin-top: 10px; border-radius: 12px; background: var(--brand); color: #ffffff; font-size: 17px; font-weight: 600; }
+.fc .btn:active { opacity: 0.8; }
+.fc .btn-text { height: 40px; padding: 0 16px; color: var(--link); font-size: 16px; font-weight: 600; }
+.fc .inline-link { color: var(--link); }
+.fc .rules { align-self: stretch; padding-left: 22px; text-align: left; font-size: 15px; line-height: 21px; display: flex; flex-direction: column; gap: 8px; }
+.fc .sheet > .t-foot { align-self: stretch; text-align: left; margin-top: 4px; }
 
 /* To'liq ekranli holatlar */
-.fc .full { min-height: calc(100vh - var(--safe-top)); min-height: calc(var(--tg-viewport-stable-height, 100vh) - var(--safe-top)); display: flex; flex-direction: column; background: var(--bg); }
-.fc .full-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 16px 24px; text-align: center; }
-.fc .full-bottom { padding: 8px 16px calc(max(var(--safe-bottom), 16px) + 18px); border-top: 0.5px solid var(--sep); background: var(--bg); }
-
-/* Skeleton — animatsiyasiz */
-.fc .sk { border-radius: 4px; background: var(--fc-skeleton); }
-.fc .skel-gap { gap: 8px; }
-.fc .skel-gap-6 { gap: 6px !important; }
-.fc .sk-value { display: flex; align-items: flex-end; gap: 8px; }
-.fc .sk-value > :last-child { margin-bottom: 6px; }
-.fc .sk-line { display: flex; justify-content: space-between; align-items: center; }
-
+.fc .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding-bottom: var(--safe-bottom); text-align: center; }
+.fc .spin { animation: fc-spin 0.9s linear infinite; }
 @keyframes fc-spin {
   to { transform: rotate(360deg); }
 }
