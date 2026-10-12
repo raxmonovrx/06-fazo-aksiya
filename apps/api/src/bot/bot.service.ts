@@ -55,7 +55,12 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
     const mode = config().BOT_MODE;
     this.register();
     if (mode === 'off') return;
-    await this.bot.init();
+    try {
+      await this.bot.init();
+    } catch (e) {
+      this.log.error(`Bot init xatosi (token?): ${(e as Error).message}`);
+      return;
+    }
     await this.setupCommands();
 
     if (mode === 'polling') {
@@ -67,12 +72,17 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
       });
     } else {
       const url = `${config().PUBLIC_URL}/api/tg/webhook`;
-      await this.bot.api.setWebhook(url, {
-        secret_token: config().BOT_WEBHOOK_SECRET,
-        allowed_updates: ['message', 'callback_query', 'my_chat_member'],
-        max_connections: 40,
-      });
-      this.log.log(`Webhook o'rnatildi: ${url}`);
+      // Xato API'ni yiqitmasin (masalan, SSL hali tayyor emas) — keyingi restartda qayta urinadi
+      try {
+        await this.bot.api.setWebhook(url, {
+          secret_token: config().BOT_WEBHOOK_SECRET,
+          allowed_updates: ['message', 'callback_query', 'my_chat_member'],
+          max_connections: 40,
+        });
+        this.log.log(`Webhook o'rnatildi: ${url}`);
+      } catch (e) {
+        this.log.error(`Webhook o'rnatilmadi: ${(e as Error).message}`);
+      }
     }
   }
 
