@@ -24,8 +24,9 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
     this.extraHandlers.push(fn);
   }
 
+  /** Versiya parametri — har deploy'da yangi URL, Telegram WebView eski keshni ochmaydi. */
   get miniAppUrl() {
-    return `${config().PUBLIC_URL}/miniapp`;
+    return `${config().PUBLIC_URL}/miniapp?v=${process.env.GIT_SHA ?? 'dev'}`;
   }
 
   get rulesUrl() {
@@ -173,7 +174,7 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
         const s = await this.participants.summary(p.id);
         const pending = (s.receipts.PENDING ?? 0) + (s.receipts.NEEDS_REVIEW ?? 0) + (s.receipts.NOT_FOUND ?? 0);
         const kb = isHttps()
-          ? new InlineKeyboard().webApp(BTN.openApp, `${this.miniAppUrl}?tab=coupons`)
+          ? new InlineKeyboard().webApp(BTN.openApp, this.miniAppUrl)
           : undefined;
         return ctx.reply(T.coupons(s.coupons, pending, s.receipts.APPROVED ?? 0), {
           parse_mode: 'HTML',
