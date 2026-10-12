@@ -12,12 +12,14 @@ import { IikoClient, type IikoServerConfig } from './iiko.client.js';
  *   — fiskal ustun nomlari `pnpm iiko:columns` natijasidan olinadi.
  */
 const serversSchema = z.array(z.object({ host: z.string().url(), login: z.string().min(1), password: z.string().min(1) }));
+// Standart qiymatlar fazo-co serverida tekshirilgan (2026-10-12, tools/iiko-columns.mjs):
+// FiscalChequeNumber = QR'dagi r; FM ("Серийный номер ФР") iiko'da bo'sh — filial orqali moslanadi.
 const fieldsSchema = z.object({
   closedAt: z.string().default('CloseTime'),
   amount: z.string().default('DishDiscountSumInt'),
-  receiptNumber: z.string().optional(),
+  receiptNumber: z.string().optional().default('FiscalChequeNumber'),
   fm: z.string().optional(),
-  refund: z.string().optional(),
+  refund: z.string().optional().default('Storned'),
   orderNum: z.string().default('OrderNum'),
 });
 export type IikoFields = z.infer<typeof fieldsSchema>;
@@ -35,7 +37,7 @@ const ymd = (d: Date) => new Date(d.getTime() + 5 * 3600_000).toISOString().slic
 /** OLAP qatorlarini SaleRow'ga aylantiradi (sof funksiya — test qilinadi). */
 export function olapToSaleRows(
   rows: Record<string, unknown>[],
-  fields: IikoFields,
+  fields: Pick<IikoFields, 'closedAt' | 'amount' | 'orderNum'> & Partial<IikoFields>,
   host: string,
   branchByDepartment: Map<string, number>,
 ): SaleRow[] {
@@ -46,21 +48,27 @@ export function olapToSaleRows(
     if (amount === null || !closedAt || amount === 0) continue;
     const department = r.Department != null ? String(r.Department) : null;
     const fm = fields.fm && r[fields.fm] != null && r[fields.fm] !== '' ? normalizeFm(String(r[fields.fm])) : null;
-    const numRaw = fields.receiptNumber ? r[fields.receiptNumber] : null;
-    const receiptNumber = numRaw != null && /^\d+$/.test(String(numRaw).trim()) ? String(Number(String(numRaw).trim())) : null;
+    // "Номера фиск. чеков" — bir buyurtmada bir nechta bo'lishi mumkin ("4495, 4496")
+    const numbers = String((fields.receiptNumber ? r[fields.receiptNumber] : '') ?? '')
+      .split(/[\s,;]+/)
+      .filter((n) => /^\d+$/.test(n))
+      .map((n) => String(Number(n)));
     const refundRaw = fields.refund ? r[fields.refund] : null;
     const isRefund = amount < 0 || refundRaw === true || /^(true|да|yes|1)$/i.test(String(refundRaw ?? ''));
-    out.push({
-      externalKey: ['IIKO', new URL(host).host, department ?? '', r[fields.orderNum] ?? '', fm ?? '', receiptNumber ?? '', closedAt.toISOString(), Math.abs(amount), isRefund ? 'R' : 'S'].join('|'),
-      fm,
-      receiptNumber,
-      branchId: department ? (branchByDepartment.get(department.toLowerCase()) ?? null) : null,
-      branchHint: department,
-      closedAt,
-      amount: Math.abs(amount),
-      isRefund,
-      raw: r,
-    });
+    const multi = numbers.length > 1;
+    for (const receiptNumber of numbers.length ? numbers : [null]) {
+      out.push({
+        externalKey: ['IIKO', new URL(host).host, department ?? '', r[fields.orderNum] ?? '', fm ?? '', receiptNumber ?? '', closedAt.toISOString(), Math.abs(amount), isRefund ? 'R' : 'S'].join('|'),
+        fm,
+        receiptNumber,
+        branchId: department ? (branchByDepartment.get(department.toLowerCase()) ?? null) : null,
+        branchHint: department,
+        closedAt,
+        amount: Math.abs(amount),
+        isRefund,
+        raw: multi ? { ...r, _multiFiscal: true } : r,
+      });
+    }
   }
   return out;
 }
@@ -102,6 +110,8 @@ export class IikoSource {
           departments: mine.map((b) => (b.iikoRef as { department: string }).department),
           groupBy: [...new Set(groupBy)],
           aggregate: [cfg.fields.amount],
+          // O'chirilgan buyurtmalar savdo emas
+          extraFilters: { OrderDeleted: { filterType: 'IncludeValues', values: ['NOT_DELETED'] } },
         }),
       );
       const mapped = olapToSaleRows(rows, cfg.fields, server.host, byDept);

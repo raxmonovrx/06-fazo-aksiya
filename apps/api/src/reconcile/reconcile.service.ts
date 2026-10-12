@@ -101,6 +101,7 @@ export class ReconcileService implements OnModuleInit {
       amount: Number(s.amount),
       isRefund: s.isRefund,
       takenByOther: s.receipts.some((x) => x.id !== r.id),
+      multiFiscal: (s.raw as { _multiFiscal?: boolean } | null)?._multiFiscal === true,
     }));
     const m = matchReceipt(
       { fm: r.fm, receiptNumber: r.receiptNumber, branchId: r.branchId, fiscalAt: r.fiscalAt },
@@ -131,6 +132,7 @@ export class ReconcileService implements OnModuleInit {
         return 'REJECTED';
       case 'TIME_MISMATCH':
       case 'AMBIGUOUS':
+      case 'MULTI_FISCAL':
         await this.prisma.receipt.updateMany({
           where: { id: r.id, status: { in: ['PENDING', 'NOT_FOUND'] } },
           data: {
@@ -139,8 +141,10 @@ export class ReconcileService implements OnModuleInit {
             rejectReason:
               m.kind === 'TIME_MISMATCH'
                 ? "iiko'da topildi, lekin vaqt 10 daqiqadan ko'p farq qiladi"
-                : `Bir nechta mos chek (${m.count} ta) — qo'lda tanlash kerak`,
-            saleRecordId: m.kind === 'TIME_MISMATCH' ? m.sale.id : null,
+                : m.kind === 'MULTI_FISCAL'
+                  ? "Bitta buyurtmada bir nechta fiskal chek — summani chekdan tekshiring"
+                  : `Bir nechta mos chek (${m.count} ta) — qo'lda tanlash kerak`,
+            saleRecordId: m.kind === 'AMBIGUOUS' ? null : m.sale.id,
           },
         });
         return 'NEEDS_REVIEW';

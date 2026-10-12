@@ -62,4 +62,31 @@ describe('matchReceipt', () => {
   it('filial noma\'lum va aniq moslik yo\'q → NONE', () => {
     expect(matchReceipt({ ...receipt, branchId: null }, [sale({})]).kind).toBe('NONE');
   });
+
+  it('FM\'siz, lekin fiskal raqamli (iiko FiscalChequeNumber): filial + raqam + vaqt', () => {
+    const s = sale({ receiptNumber: '4495', closedAt: new Date(T0.getTime() + 2000), amount: 8000 });
+    const other = sale({ receiptNumber: '4496', closedAt: min(1) });
+    expect(matchReceipt(receipt, [other, s])).toEqual({ kind: 'MATCH', sale: s, exact: true });
+  });
+
+  it('fiskal raqam bir xil, lekin vaqt uzoq (boshqa kun) → moslanmaydi', () => {
+    expect(matchReceipt(receipt, [sale({ receiptNumber: '4495', closedAt: min(60 * 24) })]).kind).toBe('NONE');
+  });
+
+  it('fiskal raqamli boshqa filial yozuvi hisobga olinmaydi', () => {
+    expect(matchReceipt(receipt, [sale({ receiptNumber: '4495', branchId: 2 })]).kind).toBe('NONE');
+  });
+
+  it('bir buyurtmada bir nechta fiskal chek → MULTI_FISCAL', () => {
+    expect(matchReceipt(receipt, [sale({ receiptNumber: '4495', multiFiscal: true })]).kind).toBe('MULTI_FISCAL');
+  });
+
+  it('fiskal raqamli refund → REFUND', () => {
+    const r = sale({ receiptNumber: '4495', isRefund: true });
+    expect(matchReceipt(receipt, [sale({ receiptNumber: '4495' }), r])).toEqual({ kind: 'REFUND', sale: r });
+  });
+
+  it('raqamli yozuv vaqt bo\'yicha (fuzzy) moslashda ishlatilmaydi', () => {
+    expect(matchReceipt(receipt, [sale({ receiptNumber: '9999', closedAt: min(1) })]).kind).toBe('NONE');
+  });
 });
