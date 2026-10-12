@@ -1,0 +1,28 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-brand: #c8102e;
+  --color-brand-dark: #9e0c24;
+  --color-gold: #d4a017;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+html,
+body {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mini app: Telegram mavzu ranglari (telegram-web-app.js o'rnatadi), yo'q bo'lsa — oddiy */
+.tg {
+  --bg: var(--tg-theme-bg-color, #ffffff);
+  --bg2: var(--tg-theme-secondary-bg-color, #f2f2f7);
+  --text: var(--tg-theme-text-color, #111111);
+  --hint: var(--tg-theme-hint-color, #8e8e93);
+  --link: var(--tg-theme-link-color, #2481cc);
+  --btn: var(--tg-theme-button-color, #c8102e);
+  --btn-text: var(--tg-theme-button-text-color, #ffffff);
+  --section: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #ffffff));
+  background: var(--bg2);
+  color: var(--text);
+  min-height: 100vh;
+}

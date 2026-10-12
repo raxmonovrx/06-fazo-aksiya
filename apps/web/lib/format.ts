@@ -1,0 +1,28 @@
+const TZ = 'Asia/Tashkent';
+
+export function fmtDate(v: string | Date | null | undefined, withTime = true) {
+  if (!v) return '—';
+  const d = typeof v === 'string' ? new Date(v) : v;
+  const parts = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: TZ,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    ...(withTime && { hour: '2-digit', minute: '2-digit' }),
+  }).format(d);
+  return parts.replace(',', '');
+}
+
+export function fmtSum(v: number | string | null | undefined) {
+  if (v === null || v === undefined || v === '') return '—';
+  return `${Math.round(Number(v)).toLocaleString('ru-RU').replace(/ /g, ' ')} so'm`;
+}
+
+export const STATUS: Record<string, { label: string; cls: string; emoji: string }> = {
+  PENDING: { label: 'Tekshirilmoqda', cls: 'bg-amber-100 text-amber-800', emoji: '⏳' },
+  APPROVED: { label: 'Tasdiqlandi', cls: 'bg-emerald-100 text-emerald-800', emoji: '✅' },
+  BELOW_MIN: { label: 'Summa kam', cls: 'bg-slate-200 text-slate-700', emoji: '➖' },
+  REJECTED: { label: 'Rad etildi', cls: 'bg-red-100 text-red-800', emoji: '❌' },
+  NOT_FOUND: { label: 'Topilmadi', cls: 'bg-orange-100 text-orange-800', emoji: '🔎' },
+  NEEDS_REVIEW: { label: 'Moderatsiyada', cls: 'bg-sky-100 text-sky-800', emoji: '👀' },
+};
