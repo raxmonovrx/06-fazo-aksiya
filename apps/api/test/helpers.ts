@@ -2,7 +2,10 @@ import { Test } from '@nestjs/testing';
 import { Bot } from 'grammy';
 import type { Update } from 'grammy/types';
 
+import type { NestExpressApplication } from '@nestjs/platform-express';
+
 import { AppModule } from '../src/app.module.js';
+import { setupApp } from '../src/setup-app.js';
 import { BOT } from '../src/telegram/bot.token.js';
 
 export interface SentCall {
@@ -36,8 +39,7 @@ export async function createTestApp() {
     .overrideProvider(BOT)
     .useValue(bot)
     .compile();
-  const app = moduleRef.createNestApplication({ logger: false });
-  app.setGlobalPrefix('api');
+  const app = setupApp(moduleRef.createNestApplication<NestExpressApplication>({ logger: false }));
   await app.init();
   await app.listen(0, '127.0.0.1');
   const baseUrl = await app.getUrl();

@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 
+import { AdminModule } from './admin/admin.module.js';
 import { BotModule } from './bot/bot.module.js';
 import { CampaignModule } from './campaign/campaign.module.js';
 import { HealthController } from './health.controller.js';
 import { ParticipantsModule } from './participants/participants.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ReceiptsModule } from './receipts/receipts.module.js';
+import { ReconcileModule } from './reconcile/reconcile.module.js';
 import { TelegramModule } from './telegram/telegram.module.js';
 
 @Module({
@@ -18,6 +20,8 @@ import { TelegramModule } from './telegram/telegram.module.js';
     ParticipantsModule,
     BotModule,
     ReceiptsModule,
+    ReconcileModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })

@@ -23,6 +23,9 @@ export type QrParseError =
 
 export type QrParseResult = { ok: true; value: ReceiptQr } | { ok: false; error: QrParseError };
 
+/** FM raqami: bo'shliqsiz, katta harf. */
+export const normalizeFm = (s: string) => s.replace(/\s+/g, '').toUpperCase();
+
 const ALLOWED_HOSTS = new Set(['ofd.soliq.uz', 'www.ofd.soliq.uz']);
 
 export function parseReceiptQr(input: string): QrParseResult {
@@ -43,7 +46,7 @@ export function parseReceiptQr(input: string): QrParseResult {
   const s = url.searchParams.get('s')?.trim();
   if (!t || !r || !c || !s) return { ok: false, error: 'MISSING_PARAMS' };
 
-  const fm = t.toUpperCase();
+  const fm = normalizeFm(t);
   if (!/^[A-Z0-9]{8,20}$/.test(fm)) return { ok: false, error: 'BAD_FM' };
   if (!/^\d{1,12}$/.test(r)) return { ok: false, error: 'BAD_RECEIPT_NUMBER' };
   if (!/^\d{6,30}$/.test(s)) return { ok: false, error: 'BAD_SIGN' };

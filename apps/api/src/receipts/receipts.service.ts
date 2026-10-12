@@ -149,6 +149,8 @@ export class ReceiptsService {
           branchId: device?.branchId ?? null,
           photoFileId: input.photoFileId,
           decidedAt: status === 'REJECTED' ? now : null,
+          // Skanerda rad etilgan bo'lsa, mijoz natijani darhol ko'rdi — ertalabki xabarga kirmaydi
+          notifiedAt: status === 'REJECTED' ? now : null,
         },
       });
     } catch (e) {
