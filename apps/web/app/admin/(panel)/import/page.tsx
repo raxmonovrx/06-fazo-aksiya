@@ -32,6 +32,7 @@ export default function ImportPage() {
   const [branchId, setBranchId] = useState('');
   const [result, setResult] = useState<Result | null>(null);
   const [runReport, setRunReport] = useState<Report | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const branches = useLoad(() => adminApi<Array<{ id: number; name: string }>>('/branches'), []);
@@ -70,6 +71,13 @@ export default function ImportPage() {
       await batches.reload();
     });
 
+  const notifyNow = () =>
+    confirm("Kechagi natijalar mijozlarga hozir yuborilsinmi? (Odatda har kuni 09:00 da avtomatik)") &&
+    wrap(async () => {
+      const r = await adminApi<{ queued: number; sent: number; failed: number; blocked: number }>('/jobs/notify', { method: 'POST' });
+      setNotice(`Xabarlar: navbatga ${r.queued}, yuborildi ${r.sent}, bot bloklangan ${r.blocked}, xato ${r.failed}`);
+    });
+
   const reconcileNow = () =>
     wrap(async () => {
       setRunReport(await adminApi<Report>('/reconcile/run', { method: 'POST' }));
@@ -79,9 +87,13 @@ export default function ImportPage() {
     <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-bold">Import va solishtirish</h1>
-        <Button variant="secondary" disabled={busy} onClick={reconcileNow}>🔄 Hozir solishtirish</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" disabled={busy} onClick={notifyNow}>📨 Xabarlarni hozir yuborish</Button>
+          <Button variant="secondary" disabled={busy} onClick={reconcileNow}>🔄 Hozir solishtirish</Button>
+        </div>
       </div>
       {runReport && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Solishtirish: {reportText(runReport)}</p>}
+      {notice && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p>}
       <ErrorBox error={error} />
 
       <Card title="1. iiko hisobotini yuklash (xlsx yoki csv)">

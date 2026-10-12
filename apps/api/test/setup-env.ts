@@ -7,3 +7,4 @@ try {
   if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
 }
 process.env.BOT_MODE = 'off';
+process.env.JOBS_DISABLED = '1';

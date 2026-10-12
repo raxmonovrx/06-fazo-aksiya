@@ -5,6 +5,7 @@ import { AdminModule } from './admin/admin.module.js';
 import { BotModule } from './bot/bot.module.js';
 import { CampaignModule } from './campaign/campaign.module.js';
 import { HealthController } from './health.controller.js';
+import { JobsModule } from './jobs/jobs.module.js';
 import { ParticipantsModule } from './participants/participants.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ReceiptsModule } from './receipts/receipts.module.js';
@@ -22,6 +23,7 @@ import { TelegramModule } from './telegram/telegram.module.js';
     ReceiptsModule,
     ReconcileModule,
     AdminModule,
+    JobsModule,
   ],
   controllers: [HealthController],
 })

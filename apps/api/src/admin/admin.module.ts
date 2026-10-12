@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 
 import { AdminAuthController } from './auth.controller.js';
 import { AdminGuard } from './auth.js';
@@ -10,6 +10,7 @@ import { ParticipantsController } from './participants.controller.js';
 import { ReceiptsAdminController } from './receipts-admin.controller.js';
 import { SettingsController } from './settings.controller.js';
 
+@Global()
 @Module({
   controllers: [
     AdminAuthController,
@@ -21,5 +22,6 @@ import { SettingsController } from './settings.controller.js';
     SettingsController,
   ],
   providers: [AdminGuard, AuditService],
+  exports: [AdminGuard, AuditService],
 })
 export class AdminModule {}
