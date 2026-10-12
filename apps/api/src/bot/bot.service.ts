@@ -99,7 +99,7 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
       await this.bot.api.setMyCommands([{ command: 'start', description: 'Boshlash / menyu' }]);
       if (isHttps()) {
         await this.bot.api.setChatMenuButton({
-          menu_button: { type: 'web_app', text: 'Chek qo\'shish', web_app: { url: this.miniAppUrl } },
+          menu_button: { type: 'web_app', text: 'Skaner', web_app: { url: this.miniAppUrl } },
         });
       }
     } catch (e) {
