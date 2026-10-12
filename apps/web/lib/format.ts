@@ -13,6 +13,23 @@ export function fmtDate(v: string | Date | null | undefined, withTime = true) {
   return parts.replace(',', '');
 }
 
+/** "12.10 13:04" — joriy yil bo'lsa yilsiz (mobil ro'yxatlar uchun). */
+export function fmtShort(v: string | Date | null | undefined) {
+  if (!v) return '—';
+  const d = typeof v === 'string' ? new Date(v) : v;
+  const sameYear = new Date().getFullYear() === d.getFullYear();
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone: TZ,
+    day: '2-digit',
+    month: '2-digit',
+    ...(!sameYear && { year: '2-digit' }),
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+    .format(d)
+    .replace(',', '');
+}
+
 export function fmtSum(v: number | string | null | undefined) {
   if (v === null || v === undefined || v === '') return '—';
   return `${Math.round(Number(v)).toLocaleString('ru-RU').replace(/ /g, ' ')} so'm`;
