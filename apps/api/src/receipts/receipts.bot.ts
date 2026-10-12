@@ -62,7 +62,7 @@ export class ReceiptsBotHandlers implements OnModuleInit {
   }
 
   private replyResult(ctx: Context, res: SubmitResult) {
-    return ctx.reply(res.message, { reply_markup: this.botService.mainMenu() });
+    return ctx.reply(res.message);
   }
 
   private async download(fileId: string): Promise<Buffer> {

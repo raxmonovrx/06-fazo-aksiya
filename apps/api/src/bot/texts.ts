@@ -4,12 +4,8 @@ export const BTN = {
   sendPhone: "📱 Raqamni yuborish",
   agree: '✅ Roziman',
   addReceipt: "🧾 Chek qo'shish",
-  myCoupons: '🎟 Kuponlarim',
-  rules: '📜 Qoidalar',
-  invite: "👥 Do'st taklif qilish",
+  invite: "👥 Do'stni taklif qilish",
   contact: '☎️ Aloqa',
-  scan: "📷 QR'ni skanerlash",
-  openApp: '🎟 Batafsil',
 } as const;
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -32,35 +28,19 @@ export const T = {
   rulesPrompt: (rulesUrl: string) =>
     `Rahmat! ✅\n\nAksiyada qatnashish uchun <a href="${rulesUrl}">qoidalar</a> bilan tanishing va rozilik bering.`,
 
-  registered:
-    `🎉 Tabriklaymiz, siz ro'yxatdan o'tdingiz!\n\n` +
-    `Endi Fazo filiallarida chek oling va uni <b>"🧾 Chek qo'shish"</b> orqali qo'shing.`,
+  home: (name?: string | null) =>
+    `${name ? `${esc(name)}, ` : ''}Fazo Club'ga xush kelibsiz! 🎉\n\n` +
+    `Fazo filiallaridagi fiskal chek QR kodini skanerlang va kupon oling. ` +
+    `Har oy sovg'alar, yil oxirida avtomobil o'ynaladi.\n\n` +
+    `🧾 Chek qo'shish — pastdagi tugma orqali. Skaner ishlamasa, chek <b>rasmini</b> shu yerga yuboring.`,
 
-  addReceipt: (canOpenApp: boolean) =>
-    (canOpenApp
-      ? `Chek pastidagi QR kodni skanerlang 👇\n\n`
-      : '') +
-    `Yoki chekning <b>rasmini</b> shu yerga yuboring — QR kod aniq ko'rinsin.\n\n` +
-    `ℹ️ Chek olingandan keyin 72 soat ichida qo'shing.`,
-
-  coupons: (coupons: number, pending: number, approved: number) =>
-    `🎟 Kuponlaringiz: <b>${coupons} ta</b>\n\n` +
-    `✅ Tasdiqlangan cheklar: ${approved}\n` +
-    `⏳ Tekshirilmoqda: ${pending}\n\n` +
-    `Kuponlar har kuni ertalab hisoblanadi.`,
-
-  rulesShort: (rulesUrl: string, rulesText: string) =>
-    (rulesText ? `${esc(rulesText)}\n\n` : '') + `To'liq qoidalar: ${rulesUrl}`,
-
-  invite: (link: string) =>
-    `👥 Do'stlaringizni taklif qiling!\n\nShu havolani yuboring:\n${link}`,
+  inviteShare: "Fazo'da ovqatlaning, chekdagi QR kodni skanerlang — oylik sovg'alar va yil oxirida avtomobil o'yini 🚗",
 
   contact: (support: string) =>
     support ? `☎️ Savol va takliflar uchun: ${esc(support)}` : `☎️ Aloqa ma'lumotlari tez orada qo'shiladi.`,
 
   blocked: `⛔️ Akkauntingiz bloklangan. Savollar bo'lsa, aloqaga chiqing.`,
   needRegister: `Avval ro'yxatdan o'ting: /start`,
-  unknown: `Menyudan tanlang 👇`,
 } as const;
 
 export { esc };

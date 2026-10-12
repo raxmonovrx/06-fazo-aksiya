@@ -46,8 +46,12 @@ describe('Bot: ro\'yxatdan o\'tish', () => {
     expect(lastText()?.reply_markup.inline_keyboard[0][0].callback_data).toBe('rules:accept');
 
     await t.send(callback(uid, 'rules:accept'));
-    expect(lastText()?.text).toContain("ro'yxatdan o'tdingiz");
-    expect(lastText()?.reply_markup.keyboard.flat().map((b: any) => b.text)).toContain("🧾 Chek qo'shish");
+    expect(lastText()?.text).toContain("Fazo Club'ga xush kelibsiz");
+    // Doimiy klaviatura yo'q — faqat inline tugmalar; eski klaviatura olib tashlanadi
+    const buttons = lastText()?.reply_markup.inline_keyboard.flat();
+    expect(buttons.map((b: any) => b.text)).toEqual(["👥 Do'stni taklif qilish", '☎️ Aloqa']);
+    expect(t.calls.some((c) => c.method === 'sendMessage' && c.payload.reply_markup?.remove_keyboard)).toBe(true);
+    expect(t.calls.some((c) => c.method === 'deleteMessage')).toBe(true);
 
     const p = await prisma.participant.findUniqueOrThrow({ where: { tgId: BigInt(uid) } });
     expect(p.phone).toBe('+998990000001');
@@ -106,11 +110,14 @@ describe('Bot: ro\'yxatdan o\'tish', () => {
     expect(lastText()?.text).toContain('/start');
   });
 
-  it('kuponlarim va do\'st taklif qilish', async () => {
+  it('eski klaviatura tugmasi yoki matn → bosh xabar; taklif havolasi va aloqa', async () => {
     const uid = BASE + 1;
     await t.send(textMessage(uid, '🎟 Kuponlarim'));
-    expect(lastText()?.text).toContain('0 ta');
-    await t.send(textMessage(uid, "👥 Do'st taklif qilish"));
-    expect(lastText()?.text).toMatch(/t\.me\/FazoClub_bot\?start=ref_[A-Z2-9]{6}/);
+    const home = lastText();
+    expect(home?.text).toContain("xush kelibsiz");
+    const invite = home?.reply_markup.inline_keyboard.flat().find((b: any) => b.url);
+    expect(decodeURIComponent(invite.url)).toMatch(/t\.me\/FazoClub_bot\?start=ref_[A-Z2-9]{6}/);
+    await t.send(callback(uid, 'contact'));
+    expect(lastText()?.text).toContain('☎️');
   });
 });

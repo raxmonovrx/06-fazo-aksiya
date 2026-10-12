@@ -3,7 +3,6 @@ import { Bot, Context, InlineKeyboard, Keyboard } from 'grammy';
 import type { Participant } from '@prisma/client';
 
 import { config, isHttps } from '../config.js';
-import { CampaignService } from '../campaign/campaign.service.js';
 import { isRegistered, ParticipantsService } from '../participants/participants.service.js';
 import { BOT } from '../telegram/bot.token.js';
 import { BTN, T } from './texts.js';
@@ -16,7 +15,6 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
   constructor(
     @Inject(BOT) private readonly bot: Bot,
     private readonly participants: ParticipantsService,
-    private readonly campaigns: CampaignService,
   ) {}
 
   /** Boshqa modullar (chek qo'shish) o'z handler'larini shu orqali ulaydi. */
@@ -33,23 +31,28 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
     return `${config().PUBLIC_URL}/rules`;
   }
 
-  mainMenu() {
-    return new Keyboard()
-      .text(BTN.addReceipt)
-      .text(BTN.myCoupons)
-      .row()
-      .text(BTN.rules)
-      .text(BTN.invite)
-      .row()
-      .text(BTN.contact)
-      .resized()
-      .persistent();
+  /** Bosh xabar ostidagi inline tugmalar (doimiy klaviatura yo'q). */
+  homeKeyboard(p: Participant) {
+    const kb = new InlineKeyboard();
+    if (isHttps()) kb.webApp(BTN.addReceipt, this.miniAppUrl).row();
+    const ref = `https://t.me/${config().BOT_USERNAME}?start=ref_${p.refCode}`;
+    kb.url(BTN.invite, `https://t.me/share/url?url=${encodeURIComponent(ref)}&text=${encodeURIComponent(T.inviteShare)}`);
+    kb.text(BTN.contact, 'contact');
+    return kb;
   }
 
-  /** Mini app faqat HTTPS bilan ochiladi; lokal dev'da tugma ko'rsatilmaydi. */
-  scanKeyboard(): InlineKeyboard | undefined {
-    if (!isHttps()) return undefined;
-    return new InlineKeyboard().webApp(BTN.scan, this.miniAppUrl);
+  /**
+   * Bosh xabar. Eski doimiy klaviaturani olib tashlash uchun remove_keyboard bilan
+   * vaqtinchalik xabar yuborib, darhol o'chiramiz (inline tugmali xabar buni qila olmaydi).
+   */
+  async sendHome(ctx: Context, p: Participant) {
+    const tmp = await ctx.reply('…', { reply_markup: { remove_keyboard: true } }).catch(() => null);
+    if (tmp) await ctx.api.deleteMessage(tmp.chat.id, tmp.message_id).catch(() => undefined);
+    return ctx.reply(T.home(ctx.from?.first_name), {
+      parse_mode: 'HTML',
+      link_preview_options: { is_disabled: true },
+      reply_markup: this.homeKeyboard(p),
+    });
   }
 
   async onApplicationBootstrap() {
@@ -126,7 +129,7 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
         });
       }
       if (!p.rulesAcceptedAt) return this.askRules(ctx);
-      return ctx.reply(T.registered, { parse_mode: 'HTML', reply_markup: this.mainMenu() });
+      return this.sendHome(ctx, p);
     });
 
     pm.on('message:contact', async (ctx) => {
@@ -140,9 +143,7 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
         const text = res.error === 'INVALID_PHONE' ? T.invalidPhone : T.phoneTaken(config().SUPPORT_CONTACT);
         return ctx.reply(text, { parse_mode: 'HTML' });
       }
-      if (res.participant.rulesAcceptedAt) {
-        return ctx.reply(T.registered, { parse_mode: 'HTML', reply_markup: this.mainMenu() });
-      }
+      if (res.participant.rulesAcceptedAt) return this.sendHome(ctx, res.participant);
       return this.askRules(ctx);
     });
 
@@ -152,10 +153,15 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
         await ctx.answerCallbackQuery();
         return ctx.reply(T.askPhone, { reply_markup: this.phoneKeyboard() });
       }
-      if (!p.rulesAcceptedAt) await this.participants.acceptRules(ctx.from.id);
+      const accepted = p.rulesAcceptedAt ? p : await this.participants.acceptRules(ctx.from.id);
       await ctx.answerCallbackQuery({ text: '✅' });
       await ctx.editMessageReplyMarkup().catch(() => undefined);
-      return ctx.reply(T.registered, { parse_mode: 'HTML', reply_markup: this.mainMenu() });
+      return this.sendHome(ctx, accepted);
+    });
+
+    bot.callbackQuery('contact', async (ctx) => {
+      await ctx.answerCallbackQuery();
+      return ctx.reply(T.contact(config().SUPPORT_CONTACT), { parse_mode: 'HTML' });
     });
 
     // Diqqat: grammY composer'i chaqirilgan joyida zanjirga qo'shiladi. Menyu va
@@ -163,47 +169,12 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
     for (const fn of this.extraHandlers) fn(bot);
     const menu = bot.chatType('private');
 
-    menu.hears(BTN.addReceipt, (ctx) =>
-      this.withParticipant(ctx, () =>
-        ctx.reply(T.addReceipt(isHttps()), { parse_mode: 'HTML', reply_markup: this.scanKeyboard() }),
-      ),
-    );
-
-    menu.hears(BTN.myCoupons, (ctx) =>
-      this.withParticipant(ctx, async (p) => {
-        const s = await this.participants.summary(p.id);
-        const pending = (s.receipts.PENDING ?? 0) + (s.receipts.NEEDS_REVIEW ?? 0) + (s.receipts.NOT_FOUND ?? 0);
-        const kb = isHttps()
-          ? new InlineKeyboard().webApp(BTN.openApp, this.miniAppUrl)
-          : undefined;
-        return ctx.reply(T.coupons(s.coupons, pending, s.receipts.APPROVED ?? 0), {
-          parse_mode: 'HTML',
-          reply_markup: kb,
-        });
-      }),
-    );
-
-    menu.hears(BTN.rules, async (ctx) => {
-      const c = await this.campaigns.getActive();
-      return ctx.reply(T.rulesShort(this.rulesUrl, c?.rulesText ?? ''), {
-        link_preview_options: { is_disabled: true },
-      });
-    });
-
-    menu.hears(BTN.invite, (ctx) =>
-      this.withParticipant(ctx, (p) =>
-        ctx.reply(T.invite(`https://t.me/${config().BOT_USERNAME}?start=ref_${p.refCode}`), {
-          link_preview_options: { is_disabled: true },
-        }),
-      ),
-    );
-
-    menu.hears(BTN.contact, (ctx) => ctx.reply(T.contact(config().SUPPORT_CONTACT)));
-
+    // Eski klaviatura tugmalari va istalgan matn — bosh xabar (klaviatura olib tashlanadi)
     menu.on('message', async (ctx) => {
       const p = await this.participants.findByTgId(ctx.from.id);
-      if (!isRegistered(p)) return ctx.reply(T.needRegister);
-      return ctx.reply(T.unknown, { reply_markup: this.mainMenu() });
+      if (!isRegistered(p)) return ctx.reply(T.needRegister, { reply_markup: { remove_keyboard: true } });
+      if (p.isBlocked) return ctx.reply(T.blocked);
+      return this.sendHome(ctx, p);
     });
   }
 

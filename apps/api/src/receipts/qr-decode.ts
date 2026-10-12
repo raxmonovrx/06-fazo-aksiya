@@ -1,5 +1,16 @@
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+
 import sharp, { type Sharp } from 'sharp';
-import { readBarcodes, type ReaderOptions } from 'zxing-wasm/reader';
+import { prepareZXingModule, readBarcodes, type ReaderOptions } from 'zxing-wasm/reader';
+
+// Standart holatda zxing-wasm .wasm faylini jsDelivr CDN'dan yuklaydi — CDN yoki tarmoq
+// ishlamasa rasm orqali chek qo'shish to'xtab qoladi. Faylni node_modules'dan o'qiymiz.
+const wasmPath = createRequire(import.meta.url).resolve('zxing-wasm/reader/zxing_reader.wasm');
+prepareZXingModule({
+  overrides: { wasmBinary: readFileSync(wasmPath).buffer as ArrayBuffer },
+  fireImmediately: false,
+});
 
 const OPTIONS: ReaderOptions = {
   formats: ['QRCode'],

@@ -30,9 +30,18 @@ export async function createTestApp() {
       has_main_web_app: false,
     } as any,
   });
+  let messageId = 1000;
   bot.api.config.use(async (_prev, method, payload) => {
-    calls.push({ method, payload: payload as Record<string, any> });
-    return { ok: true, result: method === 'getFile' ? { file_id: 'x', file_unique_id: 'x', file_path: 'photos/x.jpg' } : (true as any) } as any;
+    const p = payload as Record<string, any>;
+    calls.push({ method, payload: p });
+    // Haqiqiy API kabi: sendMessage xabar obyektini qaytaradi
+    const result =
+      method === 'getFile'
+        ? { file_id: 'x', file_unique_id: 'x', file_path: 'photos/x.jpg' }
+        : method === 'sendMessage'
+          ? { message_id: messageId++, date: Math.floor(Date.now() / 1000), chat: { id: p.chat_id, type: 'private' }, text: p.text }
+          : true;
+    return { ok: true, result } as any;
   });
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
