@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import type { NextConfig } from 'next';
 
 // Lokal dev: /api/* ni Next o'zi API'ga uzatadi. Prod'da nginx /api ni to'g'ridan-to'g'ri API'ga yuboradi.
@@ -10,6 +12,8 @@ const security = [
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // pnpm monorepo: standalone trace repo ildizidan
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   poweredByHeader: false,
   async rewrites() {
     return [{ source: '/api/:path*', destination: `${API_URL}/api/:path*` }];
