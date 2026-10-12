@@ -168,18 +168,26 @@ export default function MiniApp() {
     });
   }, [tg, busy, canScan, submit]);
 
-  // MainButton: oyna yopiq bo'lsa ko'rinadi; yuborilayotganda — yuklanish belgisi
+  // MainButton — ilovadagi yagona asosiy tugma. Drawer ochilganda uning harakati
+  // ("Tushunarli", "Boshqa chek") ham shu tugma orqali: o'lcham va rang 1:1 native.
   useEffect(() => {
     if (!tg) return;
     const mb = tg.MainButton;
-    if (state === 'ready' && !sheet) {
-      mb.setParams({ text: "QR'ni skanerlash", color: BRAND, text_color: '#FFFFFF', is_active: !busy });
-      mb.show();
-      if (busy) mb.showProgress(false);
-      else mb.hideProgress();
-    } else mb.hide();
-    mb.onClick(scan);
-    return () => mb.offClick(scan);
+    if (state !== 'ready') {
+      mb.hide();
+      return;
+    }
+    const close = () => setSheet(null);
+    let text = "QR'ni skanerlash";
+    let action: () => void = scan;
+    if (sheet === 'rules') [text, action] = ['Tushunarli', close];
+    else if (sheet) [text, action] = [sheet.primary, sheet.rescan ? scan : close];
+    mb.setParams({ text, color: BRAND, text_color: '#FFFFFF', is_active: !busy });
+    mb.show();
+    if (busy) mb.showProgress(false);
+    else mb.hideProgress();
+    mb.onClick(action);
+    return () => mb.offClick(action);
   }, [tg, state, sheet, busy, scan]);
 
   // BackButton — faqat oyna ochiq bo'lganda, uni yopadi
@@ -254,9 +262,9 @@ export default function MiniApp() {
           <Drawer.Content className="sheet" aria-describedby={undefined}>
             <Drawer.Handle className="handle" />
             {shown === 'rules' ? (
-              <RulesSheet hours={hours} rules={me.rules} onClose={() => setSheet(null)} onBot={toBot} />
+              <RulesSheet hours={hours} rules={me.rules} onBot={toBot} />
             ) : shown ? (
-              <SheetView sheet={shown} onPrimary={() => (shown.rescan ? scan() : setSheet(null))} onClose={() => setSheet(null)} />
+              <SheetView sheet={shown} />
             ) : null}
           </Drawer.Content>
         </Drawer.Portal>
@@ -322,36 +330,53 @@ function sheetFor(res: SubmitResult, hours: number): Sheet {
   }
 }
 
-function SheetView({ sheet, onPrimary, onClose }: { sheet: Sheet; onPrimary: () => void; onClose: () => void }) {
+function SheetView({ sheet }: { sheet: Sheet }) {
   return (
-    <div className="sheet-body">
+    <div className="sheet-body sheet-result">
       <div className={`mark tone-${sheet.tone}`}>{sheet.tone === 'ok' ? <IconCheck /> : sheet.tone === 'warn' ? <IconClock /> : <IconX />}</div>
       <Drawer.Title className="t-title">{sheet.title}</Drawer.Title>
       {sheet.body && <p className="t-sub c-sub">{sheet.body}</p>}
-      <button className="btn" onClick={onPrimary}>{sheet.primary}</button>
-      {sheet.rescan && <button className="btn-text" onClick={onClose}>Yopish</button>}
     </div>
   );
 }
 
-function RulesSheet({ hours, rules, onClose, onBot }: { hours: number; rules: Me['rules']; onClose: () => void; onBot: () => void }) {
-  const coupon = rules.couponPrice
-    ? `Har ${sum(rules.couponPrice)} so'm uchun 1 kupon${rules.minSum && rules.minSum > rules.couponPrice ? ` (chek kamida ${sum(rules.minSum)} so'm)` : ''}.`
-    : "Kupon soni chek summasiga bog'liq.";
+function RulesSheet({ hours, rules, onBot }: { hours: number; rules: Me['rules']; onBot: () => void }) {
+  const items: Array<[React.ReactNode, string, string]> = [
+    [<IconScan key="s" />, 'Chekni skanerlang', "Fazo filialida olingan chekdagi QR kod"],
+    [<IconTime key="t" />, `${hours} soat ichida`, "Chek olingandan keyin shu vaqt ichida qo'shing"],
+    [
+      <IconTicket key="k" />,
+      rules.couponPrice ? `Har ${sum(rules.couponPrice)} so'm — 1 kupon` : 'Summaga qarab kupon',
+      rules.minSum && rules.couponPrice && rules.minSum > rules.couponPrice
+        ? `Chek kamida ${sum(rules.minSum)} so'm. Har kuni ertalab hisoblanadi`
+        : 'Kuponlar har kuni ertalab hisoblanadi',
+    ],
+    [<IconGift key="g" />, 'Sovrinlar', "Har oy sovg'alar, yil oxirida avtomobil"],
+  ];
   return (
     <div className="sheet-body">
-      <Drawer.Title className="t-title">Qoidalar</Drawer.Title>
-      <ol className="rules">
-        <li>Fazo filialida olingan chekdagi QR kodni skanerlang.</li>
-        <li>Chekni {hours} soat ichida qo&apos;shing.</li>
-        <li>{coupon} Kuponlar har kuni ertalab hisoblanadi.</li>
-        <li>Har oy sovg&apos;alar, yil oxirida avtomobil o&apos;ynaladi.</li>
-      </ol>
-      <p className="t-foot c-sub">
-        Skaner ishlamasa — chek rasmini <button className="inline-link" onClick={onBot}>botga yuboring</button>.{' '}
-        <a className="c-link" href="/rules" target="_blank">To&apos;liq qoidalar</a>
-      </p>
-      <button className="btn" onClick={onClose}>Tushunarli</button>
+      <Drawer.Title className="sheet-title">Qoidalar</Drawer.Title>
+      <ul className="info-list">
+        {items.map(([icon, title, desc]) => (
+          <li key={title} className="info-row">
+            <span className="info-icon">{icon}</span>
+            <span className="info-text">
+              <span className="t-body-sb">{title}</span>
+              <span className="t-foot c-sub">{desc}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="link-rows">
+        <button className="link-row" onClick={onBot}>
+          <span>Chek rasmini botga yuborish</span>
+          <IconChevron />
+        </button>
+        <a className="link-row" href="/rules" target="_blank">
+          <span>To&apos;liq qoidalar</span>
+          <IconExternal />
+        </a>
+      </div>
     </div>
   );
 }
@@ -366,6 +391,17 @@ const Svg = ({ children }: { children: React.ReactNode }) => (
 const IconCheck = () => <Svg><path d="M5 12.5l4.5 4.5L19 7.5" /></Svg>;
 const IconClock = () => <Svg><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Svg>;
 const IconX = () => <Svg><path d="M7 7l10 10M17 7L7 17" /></Svg>;
+const Small = ({ children, size = 18 }: { children: React.ReactNode; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {children}
+  </svg>
+);
+const IconScan = () => <Small><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" /><path d="M8 12h8" /></Small>;
+const IconTime = () => <Small><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Small>;
+const IconTicket = () => <Small><path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v8a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2z" /><path d="M14 6v12" strokeDasharray="2 2" /></Small>;
+const IconGift = () => <Small><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5" /></Small>;
+const IconChevron = () => <span className="c-hint"><Small size={16}><path d="M9 6l6 6-6 6" /></Small></span>;
+const IconExternal = () => <span className="c-hint"><Small size={16}><path d="M7 17L17 7M9 7h8v8" /></Small></span>;
 const Spinner = () => (
   <svg className="spin" width="28" height="28" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" aria-label="Yuklanmoqda">
     <circle cx="12" cy="12" r="9" stroke="var(--line)" />
