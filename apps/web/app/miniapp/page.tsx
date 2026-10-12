@@ -43,8 +43,6 @@ interface Sheet {
   tone: Tone;
   title: string;
   body: string;
-  primary: string;
-  rescan?: boolean;
 }
 
 const BOT = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'FazoClub_bot';
@@ -168,8 +166,8 @@ export default function MiniApp() {
     });
   }, [tg, busy, canScan, submit]);
 
-  // MainButton — ilovadagi yagona asosiy tugma. Drawer ochilganda uning harakati
-  // ("Tushunarli", "Boshqa chek") ham shu tugma orqali: o'lcham va rang 1:1 native.
+  // MainButton — har doim "QR'ni skanerlash". Matnni almashtirmaymiz: Telegram Android
+  // yangi matnni bir qadam kechikib ko'rsatadi. Drawer surib / fonni bosib / Orqaga bilan yopiladi.
   useEffect(() => {
     if (!tg) return;
     const mb = tg.MainButton;
@@ -177,18 +175,20 @@ export default function MiniApp() {
       mb.hide();
       return;
     }
-    const close = () => setSheet(null);
-    let text = "QR'ni skanerlash";
-    let action: () => void = scan;
-    if (sheet === 'rules') [text, action] = ['Tushunarli', close];
-    else if (sheet) [text, action] = [sheet.primary, sheet.rescan ? scan : close];
-    mb.setParams({ text, color: BRAND, text_color: '#FFFFFF', is_active: !busy });
+    mb.setParams({ text: "QR'ni skanerlash", color: BRAND, text_color: '#FFFFFF', is_active: !busy });
     mb.show();
     if (busy) mb.showProgress(false);
     else mb.hideProgress();
-    mb.onClick(action);
-    return () => mb.offClick(action);
-  }, [tg, state, sheet, busy, scan]);
+    mb.onClick(scan);
+    return () => mb.offClick(scan);
+  }, [tg, state, busy, scan]);
+
+  // "Chek rasmini botga yuborish": bot chatga yo'riqnoma, keyin mini app yopiladi (chatga qaytadi)
+  const photoToBot = useCallback(async () => {
+    tg?.HapticFeedback?.impactOccurred('light');
+    await api('/photo-hint', { method: 'POST' }).catch(() => undefined);
+    tg?.close();
+  }, [api, tg]);
 
   // BackButton — faqat oyna ochiq bo'lganda, uni yopadi
   useEffect(() => {
@@ -262,7 +262,7 @@ export default function MiniApp() {
           <Drawer.Content className="sheet" aria-describedby={undefined}>
             <Drawer.Handle className="handle" />
             {shown === 'rules' ? (
-              <RulesSheet hours={hours} rules={me.rules} onBot={toBot} />
+              <RulesSheet hours={hours} rules={me.rules} onBot={() => void photoToBot()} />
             ) : shown ? (
               <SheetView sheet={shown} />
             ) : null}
@@ -307,26 +307,26 @@ function sheetFor(res: SubmitResult, hours: number): Sheet {
   switch (res.code) {
     case 'ACCEPTED':
       if (r?.status === 'APPROVED' && r.couponsCount > 0)
-        return { tone: 'ok', title: `+${r.couponsCount} kupon`, body: where, primary: 'Yaxshi' };
+        return { tone: 'ok', title: `+${r.couponsCount} kupon`, body: where };
       if (r?.status === 'BELOW_MIN')
-        return { tone: 'warn', title: 'Summa kam', body: `${where}. Kupon uchun summa yetarli emas.`, primary: 'Yaxshi' };
-      return { tone: 'ok', title: 'Chek qabul qilindi', body: `${where ? `${where}. ` : ''}Kuponlar ertaga ertalab hisoblanadi.`, primary: 'Yaxshi' };
+        return { tone: 'warn', title: 'Summa kam', body: `${where}. Kupon uchun summa yetarli emas.` };
+      return { tone: 'ok', title: 'Chek qabul qilindi', body: `${where ? `${where}. ` : ''}Kuponlar ertaga ertalab hisoblanadi.` };
     case 'REVIEW':
-      return { tone: 'warn', title: 'Tekshiruvga yuborildi', body: 'Natijasini botda xabar qilamiz.', primary: 'Yaxshi' };
+      return { tone: 'warn', title: 'Tekshiruvga yuborildi', body: 'Natijasini botda xabar qilamiz.' };
     case 'ALREADY_YOURS':
-      return { tone: 'warn', title: "Bu chek qo'shilgan", body: 'Bitta chek faqat bir marta hisoblanadi.', primary: 'Yaxshi' };
+      return { tone: 'warn', title: "Bu chek qo'shilgan", body: 'Bitta chek faqat bir marta hisoblanadi.' };
     case 'DUPLICATE':
-      return { tone: 'err', title: "Bu chek allaqachon qo'shilgan", body: 'Bitta chek faqat bir marta hisoblanadi.', primary: 'Boshqa chek', rescan: true };
+      return { tone: 'err', title: "Bu chek allaqachon qo'shilgan", body: 'Bitta chek faqat bir marta hisoblanadi.' };
     case 'WINDOW_EXPIRED':
-      return { tone: 'err', title: 'Chek eskirgan', body: `Faqat oxirgi ${hours} soatdagi cheklar qabul qilinadi.`, primary: 'Boshqa chek', rescan: true };
+      return { tone: 'err', title: 'Chek eskirgan', body: `Faqat oxirgi ${hours} soatdagi cheklar qabul qilinadi.` };
     case 'INVALID_QR':
-      return { tone: 'err', title: 'Fiskal chek emas', body: 'Chek pastidagi soliq QR kodini skanerlang.', primary: 'Qayta skanerlash', rescan: true };
+      return { tone: 'err', title: 'Fiskal chek emas', body: 'Chek pastidagi soliq QR kodini skanerlang.' };
     case 'RATE_LIMIT':
-      return { tone: 'warn', title: "Juda ko'p urinish", body: "Birozdan keyin qayta urinib ko'ring.", primary: 'Yaxshi' };
+      return { tone: 'warn', title: "Juda ko'p urinish", body: "Birozdan keyin qayta urinib ko'ring." };
     case 'OFFLINE':
-      return { tone: 'err', title: "Internet yo'q", body: res.message, primary: 'Qayta skanerlash', rescan: true };
+      return { tone: 'err', title: "Internet yo'q", body: res.message };
     default:
-      return { tone: 'err', title: 'Chek qabul qilinmadi', body: res.message, primary: 'Yaxshi' };
+      return { tone: 'err', title: 'Chek qabul qilinmadi', body: res.message };
   }
 }
 

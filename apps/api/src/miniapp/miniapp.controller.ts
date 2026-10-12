@@ -1,10 +1,13 @@
-import { Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import type { Bot } from 'grammy';
 import { z } from 'zod';
 
 import { CampaignService } from '../campaign/campaign.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ParticipantsService } from '../participants/participants.service.js';
+import { RateLimiter } from '../receipts/rate-limiter.js';
 import { ReceiptsService } from '../receipts/receipts.service.js';
+import { BOT } from '../telegram/bot.token.js';
 import { MiniappGuard, type MiniappRequest } from './miniapp.guard.js';
 
 const submitSchema = z.object({ text: z.string().min(1).max(2000) });
@@ -12,7 +15,10 @@ const submitSchema = z.object({ text: z.string().min(1).max(2000) });
 @Controller('miniapp')
 @UseGuards(MiniappGuard)
 export class MiniappController {
+  private readonly hintLimiter = new RateLimiter(3, 60_000);
+
   constructor(
+    @Inject(BOT) private readonly bot: Bot,
     private readonly receipts: ReceiptsService,
     private readonly participants: ParticipantsService,
     private readonly campaigns: CampaignService,
@@ -55,5 +61,18 @@ export class MiniappController {
     const parsed = submitSchema.safeParse(body);
     const text = parsed.success ? parsed.data.text : '';
     return this.receipts.submit({ participant: req.participant, text, source: 'QR' });
+  }
+
+  /** "Chek rasmini botga yuborish": bot chatga yo'riqnoma yuboradi, mini app esa yopiladi. */
+  @Post('photo-hint')
+  @HttpCode(200)
+  async photoHint(@Req() req: MiniappRequest) {
+    const p = req.participant;
+    if (this.hintLimiter.hit(String(p.id))) {
+      await this.bot.api
+        .sendMessage(Number(p.tgId), "📷 Chekning rasmini shu yerga yuboring.\nQR kod aniq va to'liq ko'rinsin.")
+        .catch(() => undefined);
+    }
+    return { ok: true };
   }
 }

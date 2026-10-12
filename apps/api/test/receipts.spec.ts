@@ -177,4 +177,11 @@ describe('Chek qo\'shish', () => {
     const r = await prisma.receipt.findFirstOrThrow({ where: { photoFileId: 'BLANK', participant: { tgId: BigInt(BASE + 5) } } });
     expect(r).toMatchObject({ status: 'NEEDS_REVIEW', rejectCode: 'QR_UNREADABLE', fm: null });
   });
+
+  it('photo-hint: bot chatga yo\'riqnoma yuboradi', async () => {
+    const res = await fetch(`${t.baseUrl}/miniapp/photo-hint`, { method: 'POST', headers: { authorization: `tma ${initData(1)}` } });
+    expect(res.status).toBe(200);
+    const msg = t.calls.find((c) => c.method === 'sendMessage' && c.payload.chat_id === BASE + 1);
+    expect(msg?.payload.text).toContain('rasmini shu yerga yuboring');
+  });
 });
