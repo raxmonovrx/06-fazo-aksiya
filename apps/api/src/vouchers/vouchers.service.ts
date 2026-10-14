@@ -7,6 +7,7 @@ import { esc } from '../bot/texts.js';
 import { CampaignService } from '../campaign/campaign.service.js';
 import { config } from '../config.js';
 import { calcCoupons } from '../core/coupons.js';
+import { toImageDataUrl } from '../core/image-data-url.js';
 import { normalizePhone } from '../core/phone.js';
 import { formatTashkent, tashkentDayStart } from '../core/time.js';
 import { newVoucherToken, voucherStartParam } from '../core/voucher-token.js';
@@ -65,7 +66,7 @@ export class VouchersService {
     if (!branchId) {
       throw new BadRequestException(actor.role === 'ADMIN' ? 'Filialni tanlang' : 'Sizga filial biriktirilmagan — adminga murojaat qiling');
     }
-    const branch = await this.prisma.branch.findUnique({ where: { id: branchId } });
+    const branch = await this.prisma.branch.findUnique({ where: { id: branchId }, omit: { logoPrint: false } });
     if (!branch) throw new BadRequestException('Filial topilmadi');
     if (!branch.isActive) throw new BadRequestException('Bu filial aksiyada qatnashmaydi');
     const terminal = input.terminalId ? await this.prisma.terminal.findUnique({ where: { id: input.terminalId } }) : null;
@@ -118,11 +119,11 @@ export class VouchersService {
       });
       return v;
     });
-    return this.present(voucher, branch.name, true);
+    return this.present(voucher, branch.name, true, branch);
   }
 
-  /** QR va havola bilan (chop etish / qayta chop etish uchun). */
-  async present(v: Voucher, branchName: string, withQr: boolean) {
+  /** QR va havola bilan (chop etish / qayta chop etish uchun). `logoOf` — filial chek logosi */
+  async present(v: Voucher, branchName: string, withQr: boolean, logoOf?: { logoEnabled: boolean; logoPrint?: Uint8Array | null }) {
     const link = voucherLink(v.token);
     return {
       id: v.id,
@@ -137,17 +138,20 @@ export class VouchersService {
       issuedAt: v.issuedAt,
       expiresAt: v.expiresAt,
       link,
-      ...(withQr && { qrSvg: await QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) }),
+      ...(withQr && {
+        qrSvg: await QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }),
+        logo: logoOf?.logoEnabled ? toImageDataUrl(logoOf.logoPrint) : null,
+      }),
     };
   }
 
   async reprint(actor: AdminUser, id: number) {
-    const v = await this.prisma.voucher.findUnique({ where: { id }, include: { branch: true } });
+    const v = await this.prisma.voucher.findUnique({ where: { id }, include: { branch: { omit: { logoPrint: false } } } });
     if (!v) throw new NotFoundException();
     this.assertCanManage(actor, v);
     if (v.status !== 'ISSUED') throw new ConflictException('Faqat ishlatilmagan vaucherni qayta chop etish mumkin');
     await this.prisma.auditLog.create({ data: { actorId: actor.id, action: 'voucher.reprint', entity: 'voucher', entityId: String(id) } });
-    return this.present(v, v.branch.name, true);
+    return this.present(v, v.branch.name, true, v.branch);
   }
 
   async cancel(actor: AdminUser, id: number, reason: string) {

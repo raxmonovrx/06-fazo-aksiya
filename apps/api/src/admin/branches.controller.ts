@@ -1,7 +1,8 @@
-import { Body, ConflictException, Controller, Delete, Get, NotFoundException, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Delete, Get, NotFoundException, Param, ParseIntPipe, Patch, Post, Put, UseGuards } from '@nestjs/common';
 import { Prisma, type AdminUser } from '@prisma/client';
 import { z } from 'zod';
 
+import { decodeImageDataUrl, toImageDataUrl } from '../core/image-data-url.js';
 import { normalizeFm } from '../core/receipt-qr.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ReconcileService } from '../reconcile/reconcile.service.js';
@@ -19,6 +20,18 @@ const branchSchema = z.object({
   maxPerReceipt: z.coerce.number().int().min(1).max(1000).optional(),
   iikoRef: z.object({ host: z.string().optional(), department: z.string().optional() }).nullish(),
 });
+const logoSchema = z.object({
+  enabled: z.boolean(),
+  threshold: z.coerce.number().int().min(0).max(255),
+  invert: z.boolean(),
+  // Berilmasa — o'zgarmaydi; null — logoni o'chirish
+  original: z.string().max(3_000_000).nullable().optional(),
+  print: z.string().max(1_000_000).nullable().optional(),
+});
+/** Asl rasm (qayta sozlash uchun) va chekka chiqadigan oq-qora PNG chegaralari */
+const LOGO_ORIGINAL_MAX = 1_500_000;
+const LOGO_PRINT_MAX = 500_000;
+
 const deviceSchema = z.object({
   fm: z.string().trim().min(6).max(30),
   legalName: z.string().trim().max(200).nullish(),
@@ -108,6 +121,60 @@ export class BranchesController {
     if (!d) throw new NotFoundException();
     await this.audit.log(admin.id, 'device.delete', 'fiscal_device', id, d);
     return { ok: true };
+  }
+
+  /** Chek logosi sozlamasi (asl rasm bilan — panelda qayta oq-qora qilish uchun) */
+  @Get('branches/:id/logo')
+  async logo(@Param('id', ParseIntPipe) id: number) {
+    const b = await this.prisma.branch.findUnique({ where: { id }, omit: { logoOriginal: false, logoPrint: false } });
+    if (!b) throw new NotFoundException();
+    return {
+      enabled: b.logoEnabled,
+      threshold: b.logoThreshold,
+      invert: b.logoInvert,
+      updatedAt: b.logoUpdatedAt,
+      original: toImageDataUrl(b.logoOriginal),
+      print: toImageDataUrl(b.logoPrint),
+    };
+  }
+
+  @Put('branches/:id/logo')
+  async saveLogo(@Param('id', ParseIntPipe) id: number, @Body() body: unknown, @CurrentAdmin() admin: AdminUser) {
+    const data = parse(logoSchema, body);
+    const b = await this.prisma.branch.findUnique({ where: { id }, omit: { logoPrint: false } });
+    if (!b) throw new NotFoundException();
+
+    const bytes: { logoOriginal?: Uint8Array<ArrayBuffer> | null; logoPrint?: Uint8Array<ArrayBuffer> | null } = {};
+    if (data.original !== undefined) {
+      const v = data.original === null ? null : decodeImageDataUrl(data.original, LOGO_ORIGINAL_MAX);
+      if (typeof v === 'string') throw new BadRequestException(v);
+      bytes.logoOriginal = v;
+    }
+    if (data.print !== undefined) {
+      const v = data.print === null ? null : decodeImageDataUrl(data.print, LOGO_PRINT_MAX, 'image/png');
+      if (typeof v === 'string') throw new BadRequestException(v);
+      bytes.logoPrint = v;
+    }
+    const hasPrint = bytes.logoPrint !== undefined ? Boolean(bytes.logoPrint) : Boolean(b.logoPrint);
+    if (data.enabled && !hasPrint) throw new BadRequestException('Avval logo yuklang');
+
+    await this.prisma.branch.update({
+      where: { id },
+      data: {
+        logoEnabled: data.enabled,
+        logoThreshold: data.threshold,
+        logoInvert: data.invert,
+        ...bytes,
+        ...((bytes.logoOriginal !== undefined || bytes.logoPrint !== undefined) && { logoUpdatedAt: new Date() }),
+      },
+    });
+    await this.audit.log(admin.id, 'branch.logo', 'branch', id, {
+      enabled: data.enabled,
+      threshold: data.threshold,
+      invert: data.invert,
+      ...(bytes.logoPrint !== undefined && { print: bytes.logoPrint ? `${bytes.logoPrint.length} B` : null }),
+    });
+    return this.logo(id);
   }
 
   @Get('unknown-fms')

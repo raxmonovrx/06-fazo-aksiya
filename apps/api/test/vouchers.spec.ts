@@ -284,6 +284,40 @@ describe('Vaucherlar (kassir QR)', () => {
     expect(await (await api('tv_admin', `/terminals/${le.id}`, { method: 'DELETE' })).json()).toMatchObject({ archived: false });
   });
 
+  it('chek logosi: admin yuklaydi va yoqadi, QR javobida chiqadi; ro\'yxatlarda baytlar yo\'q', async () => {
+    const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==';
+    const put = (who: string, json: unknown) => api(who, `/branches/${fazoId}/logo`, { method: 'PUT', json });
+    try {
+      expect((await put('tv_kassa1', { enabled: true, threshold: 160, invert: false, print: PNG })).status).toBe(403);
+      // Logosiz yoqib bo'lmaydi; PNG bo'lmagan "rasm" qabul qilinmaydi
+      await put('tv_admin', { enabled: false, threshold: 160, invert: false, original: null, print: null });
+      expect((await put('tv_admin', { enabled: true, threshold: 160, invert: false })).status).toBe(400);
+      expect((await put('tv_admin', { enabled: true, threshold: 160, invert: false, print: 'data:image/png;base64,AAAA' })).status).toBe(400);
+
+      const saved = await (await put('tv_admin', { enabled: true, threshold: 120, invert: true, original: PNG, print: PNG })).json();
+      expect(saved).toMatchObject({ enabled: true, threshold: 120, invert: true, print: PNG, original: PNG });
+
+      const v = await issue('tv_kassa1', { amount: 200000 });
+      expect(v.logo).toBe(PNG);
+      const again = await (await api('tv_kassa1', `/vouchers/${v.id}/reprint`, { method: 'POST' })).json();
+      expect(again.logo).toBe(PNG);
+
+      const branches = await (await api('tv_kassa1', '/branches')).json();
+      const b = branches.find((x: any) => x.id === fazoId);
+      expect(b).toMatchObject({ logoEnabled: true });
+      expect(b).not.toHaveProperty('logoPrint');
+      expect(b).not.toHaveProperty('logoOriginal');
+
+      await put('tv_admin', { enabled: false, threshold: 120, invert: true });
+      expect((await issue('tv_kassa1', { amount: 200000 })).logo).toBeNull();
+    } finally {
+      await prisma.branch.update({
+        where: { id: fazoId },
+        data: { logoEnabled: false, logoOriginal: null, logoPrint: null, logoThreshold: 160, logoInvert: false, logoUpdatedAt: null },
+      });
+    }
+  });
+
   it('holat: kassa ekrani skanerlanishini kutadi', async () => {
     const v = await issue('tv_kassa1', { amount: 200000 });
     expect(await (await api('tv_kassa1', `/vouchers/${v.id}/status`)).json()).toMatchObject({ status: 'ISSUED' });

@@ -33,17 +33,26 @@ model Campaign {
 }
 
 model Branch {
-  id            Int      @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   name          String
   brand         String?
-  isActive      Boolean  @default(true)
-  minSum        Decimal  @default(100000) @db.Decimal(14, 2)
-  couponPrice   Decimal  @default(100000) @db.Decimal(14, 2)
-  maxPerReceipt Int      @default(10)
+  isActive      Boolean   @default(true)
+  minSum        Decimal   @default(100000) @db.Decimal(14, 2)
+  couponPrice   Decimal   @default(100000) @db.Decimal(14, 2)
+  maxPerReceipt Int       @default(10)
   // iiko bog'lanishi: { host, department }
   iikoRef       Json?
-  createdAt     DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+  // Chekdagi logo: admin yuklaydi, brauzerda oq-qora qilinadi (termoprinter faqat qora chiqaradi).
+  // Asl rasm qayta sozlash uchun saqlanadi; ro'yxatlarda bu baytlar qaytarilmaydi
+  logoEnabled   Boolean   @default(false)
+  logoOriginal  Bytes?
+  logoPrint     Bytes?
+  // Oq-qora chegarasi (0–255) va ranglarni almashtirish (to'q fonli logolar uchun)
+  logoThreshold Int       @default(160)
+  logoInvert    Boolean   @default(false)
+  logoUpdatedAt DateTime? @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
 
   devices     FiscalDevice[]
   receipts    Receipt[]
@@ -55,7 +64,9 @@ model Branch {
   @@map("branches")
 }
 
-/** Filialdagi kassa qurilmasi: kassir shu tugmani bossa, QR shu usulda chiqadi */
+/**
+ * Filialdagi kassa qurilmasi: kassir shu tugmani bossa, QR shu usulda chiqadi
+ */
 model Terminal {
   id        Int            @id @default(autoincrement())
   branchId  Int

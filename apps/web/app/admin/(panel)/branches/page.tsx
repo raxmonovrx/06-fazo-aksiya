@@ -14,6 +14,7 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { BranchLogo } from '@/components/admin/branch-logo';
 import { DataTableCard } from '@/components/admin/data-table';
 import { ErrorAlert, TableLoading, useLoad } from '@/components/admin/kit';
 import {
@@ -120,7 +121,7 @@ interface UnknownFm {
 }
 
 type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
-type EditorTab = 'general' | 'rule' | 'iiko' | 'devices' | 'terminals';
+type EditorTab = 'general' | 'rule' | 'receipt' | 'iiko' | 'devices' | 'terminals';
 
 /** 100000 → "100 000" (so'msiz) */
 const fmtNum = (v: number | string) =>
@@ -572,7 +573,8 @@ function BranchEditor({
         <div className="px-4 pt-3">
           <TabsList className="w-full">
             <TabsTrigger value="general">Umumiy</TabsTrigger>
-            <TabsTrigger value="rule">Kupon qoidasi</TabsTrigger>
+            <TabsTrigger value="rule">Kupon</TabsTrigger>
+            <TabsTrigger value="receipt">Chek</TabsTrigger>
             <TabsTrigger value="iiko">iiko</TabsTrigger>
             <TabsTrigger value="terminals">
               Terminallar
@@ -706,6 +708,10 @@ function BranchEditor({
             </FieldGroup>
           </TabsContent>
 
+          <TabsContent value="receipt">
+            <BranchLogo branchId={b.id} branchName={b.name} />
+          </TabsContent>
+
           <TabsContent value="terminals" className="flex flex-col gap-4">
             <TerminalsList terminals={b.terminals} run={run} />
             <AddTerminalForm branchId={b.id} run={run} />
@@ -724,15 +730,22 @@ function BranchEditor({
             {tab === 'devices' ? 'FM' : 'Terminallar'} darhol saqlanadi
           </span>
         )}
-        <Button variant="outline" onClick={onClose} disabled={busy}>
-          Bekor qilish
-        </Button>
-        <Button disabled={busy || !dirty || !valid} onClick={() => void save()}>
-          {busy && (
-            <RiLoader4Line data-icon="inline-start" className="animate-spin" />
-          )}
-          Saqlash
-        </Button>
+        {/* Chek yorlig'i o'z tugmasi bilan saqlanadi — bu yerda faqat yopish */}
+        {tab === 'receipt' ? (
+          <Button variant="outline" onClick={onClose}>
+            Yopish
+          </Button>
+        ) : (
+          <>
+            <Button variant="outline" onClick={onClose} disabled={busy}>
+              Bekor qilish
+            </Button>
+            <Button disabled={busy || !dirty || !valid} onClick={() => void save()}>
+              {busy && <RiLoader4Line data-icon="inline-start" className="animate-spin" />}
+              Saqlash
+            </Button>
+          </>
+        )}
       </SheetFooter>
     </>
   );
