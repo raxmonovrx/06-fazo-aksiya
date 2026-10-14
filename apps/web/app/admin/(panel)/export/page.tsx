@@ -1,25 +1,78 @@
 'use client';
 
-import { Card } from '@/components/ui';
+import {
+  RiCoupon3Line,
+  RiDownload2Line,
+  RiFileList3Line,
+  RiGroupLine,
+} from '@remixicon/react';
+
+import { PageToolbar } from '@/components/admin/kit';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 
 const ITEMS = [
-  { key: 'participants', title: 'Ishtirokchilar', desc: "Telefon, ism, manba, ro'yxatdan o'tgan sana, cheklar va kuponlar soni" },
-  { key: 'coupons', title: 'Kuponlar', desc: "Kupon raqami, egasi, chek, filial, summa, o'yinda qatnashadimi" },
-  { key: 'receipts', title: 'Cheklar', desc: 'Barcha cheklar: status, sabab, FM, chek raqami, summa, kuponlar' },
+  {
+    key: 'participants',
+    title: 'Ishtirokchilar',
+    desc: "Telefon, ism, manba, ro'yxatdan o'tgan sana, cheklar va kuponlar soni",
+    icon: RiGroupLine,
+  },
+  {
+    key: 'coupons',
+    title: 'Kuponlar',
+    desc: "Kupon raqami, egasi, chek, filial, summa, o'yinda qatnashadimi",
+    icon: RiCoupon3Line,
+  },
+  {
+    key: 'receipts',
+    title: 'Cheklar',
+    desc: 'Barcha cheklar: status, sabab, FM, chek raqami, summa, kuponlar',
+    icon: RiFileList3Line,
+  },
 ];
 
 export default function ExportPage() {
   return (
     <>
-      <h1 className="text-xl font-bold">Eksport</h1>
-      <div className="grid gap-4 md:grid-cols-3">
+      <PageToolbar description="Ma'lumotlarni Excel (XLSX) yoki CSV faylga yuklab oling. Fayl joriy holat bo'yicha tayyorlanadi." />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {ITEMS.map((i) => (
-          <Card key={i.key} title={i.title}>
-            <p className="mb-4 text-sm text-muted-foreground">{i.desc}</p>
-            <div className="flex gap-2">
-              <a className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90" href={`/api/admin/export/${i.key}.xlsx`}>XLSX</a>
-              <a className="rounded-lg border border-border px-3 py-2 text-sm font-medium" href={`/api/admin/export/${i.key}.csv`}>CSV</a>
-            </div>
+          <Card key={i.key}>
+            <CardHeader>
+              <span className="mb-1 grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
+                <i.icon className="size-[18px]" />
+              </span>
+              <CardTitle>{i.title}</CardTitle>
+              <CardDescription>{i.desc}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1" />
+            <CardFooter className="gap-2">
+              <Button
+                size="sm"
+                nativeButton={false}
+                render={<a href={`/api/admin/export/${i.key}.xlsx`} />}
+              >
+                <RiDownload2Line data-icon="inline-start" />
+                XLSX
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                nativeButton={false}
+                render={<a href={`/api/admin/export/${i.key}.csv`} />}
+              >
+                <RiDownload2Line data-icon="inline-start" />
+                CSV
+              </Button>
+            </CardFooter>
           </Card>
         ))}
       </div>
