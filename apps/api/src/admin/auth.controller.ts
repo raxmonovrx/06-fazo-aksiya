@@ -54,8 +54,17 @@ export class AdminAuthController {
   @Roles('ADMIN', 'OPERATOR', 'CASHIER')
   async me(@CurrentAdmin() admin: AdminUser) {
     const branch = admin.branchId
-      ? await this.prisma.branch.findUnique({ where: { id: admin.branchId }, select: { id: true, name: true } })
+      ? await this.prisma.branch.findUnique({
+          where: { id: admin.branchId },
+          select: { id: true, name: true, minSum: true, couponPrice: true, maxPerReceipt: true },
+        })
       : null;
-    return { id: admin.id, login: admin.login, role: admin.role, branch };
+    return {
+      id: admin.id,
+      login: admin.login,
+      role: admin.role,
+      // Kassa sahifasi kupon sonini oldindan ko'rsatishi uchun filial qoidasi bilan
+      branch: branch && { ...branch, minSum: Number(branch.minSum), couponPrice: Number(branch.couponPrice) },
+    };
   }
 }

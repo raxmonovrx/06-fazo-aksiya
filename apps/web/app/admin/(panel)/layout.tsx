@@ -1,10 +1,12 @@
 'use client';
 
 import { RiLoader4Line } from '@remixicon/react';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { AppSidebar } from '@/components/app-sidebar';
 import { DashboardShell } from '@/components/dashboard-shell';
+import { homeFor, inSection, sectionsFor } from '@/components/nav-tree';
 import { adminApi } from '@/lib/api';
 import { AdminContext, type AdminMe } from './admin-context';
 
@@ -25,6 +27,13 @@ export default function PanelLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const [me, setMe] = useState<AdminMe | null>(null);
+  const pathname = usePathname();
+  const router = useRouter();
+  // Rolga tegishli bo'lmagan sahifa ochilsa (masalan kassir /admin) — o'z sahifasiga
+  const allowed = !me || sectionsFor(me.role).some((s) => inSection(pathname, s.url));
+  useEffect(() => {
+    if (me && !allowed) router.replace(homeFor(me.role));
+  }, [me, allowed, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,7 +51,7 @@ export default function PanelLayout({
     };
   }, []);
 
-  if (!me) return <LoadingScreen />;
+  if (!me || !allowed) return <LoadingScreen />;
 
   return (
     <AdminContext.Provider value={me}>

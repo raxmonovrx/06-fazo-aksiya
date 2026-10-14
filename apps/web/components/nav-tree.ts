@@ -5,6 +5,8 @@ import {
   RiDownload2Line,
   RiEyeLine,
   RiGroupLine,
+  RiQrCodeLine,
+  RiTicket2Line,
   RiReceiptLine,
   RiSettings3Line,
   RiUserStarLine,
@@ -27,12 +29,16 @@ export interface NavSection extends NavItem {
   icon: RemixiconComponentType;
   /** Faqat ADMIN ko'radi (OPERATOR — yo'q) */
   adminOnly?: boolean;
+  /** Ko'radigan rollar (berilmasa: ADMIN va OPERATOR; adminOnly — faqat ADMIN) */
+  roles?: AdminMe['role'][];
   /** Ichki sahifalar — sidebar'da bo'lim ostida daraxt bo'lib chiqadi */
   items?: NavItem[];
 }
 
 export const NAV_SECTIONS: NavSection[] = [
   { title: 'Dashboard', url: '/admin', icon: RiDashboardLine },
+  { title: 'Kassa', url: '/admin/cashier', icon: RiQrCodeLine, roles: ['ADMIN', 'CASHIER'] },
+  { title: 'Vaucherlar', url: '/admin/vouchers', icon: RiTicket2Line },
   { title: 'Moderatsiya', url: '/admin/moderation', icon: RiEyeLine },
   { title: 'Cheklar', url: '/admin/receipts', icon: RiReceiptLine },
   { title: 'Ishtirokchilar', url: '/admin/participants', icon: RiGroupLine },
@@ -70,7 +76,15 @@ export const NAV_SECTIONS: NavSection[] = [
 
 /** Rolga ko'ra ko'rinadigan bo'limlar */
 export function sectionsFor(role: AdminMe['role']): NavSection[] {
-  return NAV_SECTIONS.filter((s) => !s.adminOnly || role === 'ADMIN');
+  return NAV_SECTIONS.filter((s) => {
+    const roles = s.roles ?? (s.adminOnly ? ['ADMIN'] : ['ADMIN', 'OPERATOR']);
+    return roles.includes(role);
+  });
+}
+
+/** Rol kira oladigan birinchi sahifa (kassir — faqat Kassa) */
+export function homeFor(role: AdminMe['role']): string {
+  return role === 'CASHIER' ? '/admin/cashier' : '/admin';
 }
 
 /**

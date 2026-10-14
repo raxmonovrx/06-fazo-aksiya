@@ -103,13 +103,15 @@ interface Campaign {
   receiptWindowHours: number;
   rulesText: string;
 }
-type Role = 'ADMIN' | 'OPERATOR';
+type Role = 'ADMIN' | 'OPERATOR' | 'CASHIER';
 interface User {
   id: number;
   login: string;
   role: Role;
   isActive: boolean;
   createdAt: string;
+  branchId: number | null;
+  branch: { id: number; name: string } | null;
 }
 
 const ROLES: Array<{ value: Role; label: string; description: string }> = [
@@ -123,8 +125,13 @@ const ROLES: Array<{ value: Role; label: string; description: string }> = [
     label: 'Admin',
     description: "To'liq kirish: sozlamalar, filiallar, import, adminlar",
   },
+  {
+    value: 'CASHIER',
+    label: 'Kassir',
+    description: "Faqat «Kassa»: o'z filialida mijozga QR chiqaradi",
+  },
 ];
-const roleLabel = (r: Role) => (r === 'ADMIN' ? 'Admin' : 'Operator');
+const roleLabel = (r: Role) => ROLES.find((x) => x.value === r)?.label ?? r;
 
 const RULES_MAX = 20_000;
 const WINDOW_MAX = 24 * 30;
@@ -163,7 +170,7 @@ const EMPTY_GENERAL: General = {
   endsAt: '',
   receiptWindowHours: '',
 };
-const EMPTY_USER = { login: '', password: '', role: 'OPERATOR' as Role };
+const EMPTY_USER = { login: '', password: '', role: 'OPERATOR' as Role, branchId: '' };
 
 const num = (n: number) => n.toLocaleString('ru-RU').replace(/\s/g, ' ');
 
@@ -235,6 +242,8 @@ export default function SettingsPage() {
   const me = useAdmin();
   const campaign = useLoad(() => adminApi<Campaign>('/settings/campaign'), []);
   const users = useLoad(() => adminApi<User[]>('/users'), []);
+  const branchList = useLoad(() => adminApi<Array<{ id: number; name: string }>>('/branches'), []);
+  const branchItems = (branchList.data ?? []).map((b) => ({ value: String(b.id), label: b.name }));
 
   const [gen, setGen] = useState<General>(EMPTY_GENERAL);
   const [rules, setRules] = useState('');
@@ -348,7 +357,10 @@ export default function SettingsPage() {
       ? '3–32 belgi: lotin harf, raqam, . _ -'
       : null;
   const nuValid =
-    LOGIN_RE.test(nu.login.trim()) && nu.password.length >= 8 && !!nu.role;
+    LOGIN_RE.test(nu.login.trim()) &&
+    nu.password.length >= 8 &&
+    !!nu.role &&
+    (nu.role !== 'CASHIER' || !!nu.branchId);
 
   return (
     <PageContainer size="narrow" className="gap-8">
@@ -664,6 +676,11 @@ export default function SettingsPage() {
                           {u.role === 'ADMIN' && <RiShieldUserLine />}
                           {roleLabel(u.role)}
                         </Badge>
+                        {u.role === 'CASHIER' && (
+                          <span className="ml-1.5 text-xs text-muted-foreground">
+                            {u.branch?.name ?? 'filial yo‘q'}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span className="inline-flex items-center gap-1.5 text-sm">
@@ -738,6 +755,33 @@ export default function SettingsPage() {
                                   </DropdownMenuSubContent>
                                 </DropdownMenuSub>
                               )}
+                              {u.role === 'CASHIER' && (
+                                <DropdownMenuSub>
+                                  <DropdownMenuSubTrigger>
+                                    <RiShieldUserLine />
+                                    Filial
+                                  </DropdownMenuSubTrigger>
+                                  <DropdownMenuSubContent className="w-48">
+                                    <DropdownMenuRadioGroup
+                                      value={String(u.branchId ?? '')}
+                                      onValueChange={(v) => {
+                                        if (v && v !== String(u.branchId))
+                                          void patchUser(
+                                            u,
+                                            { branchId: Number(v) },
+                                            `Filial: ${branchItems.find((b) => b.value === v)?.label ?? ''}`,
+                                          );
+                                      }}
+                                    >
+                                      {branchItems.map((b) => (
+                                        <DropdownMenuRadioItem key={b.value} value={b.value}>
+                                          {b.label}
+                                        </DropdownMenuRadioItem>
+                                      ))}
+                                    </DropdownMenuRadioGroup>
+                                  </DropdownMenuSubContent>
+                                </DropdownMenuSub>
+                              )}
                             </DropdownMenuGroup>
                             {!isMe && (
                               <>
@@ -797,7 +841,12 @@ export default function SettingsPage() {
                 () =>
                   adminApi('/users', {
                     method: 'POST',
-                    json: { ...nu, login: nu.login.trim() },
+                    json: {
+                      login: nu.login.trim(),
+                      password: nu.password,
+                      role: nu.role,
+                      branchId: nu.role === 'CASHIER' ? Number(nu.branchId) : null,
+                    },
                   }),
                 "Foydalanuvchi qo'shildi",
               );
@@ -869,6 +918,28 @@ export default function SettingsPage() {
                   {ROLES.find((r) => r.value === nu.role)?.description}
                 </FieldDescription>
               </Field>
+              {nu.role === 'CASHIER' && (
+                <Field>
+                  <FieldLabel htmlFor="nu-branch">Filial</FieldLabel>
+                  <Select
+                    items={branchItems}
+                    value={nu.branchId || null}
+                    onValueChange={(v) => setNu({ ...nu, branchId: (v as string | null) ?? '' })}
+                  >
+                    <SelectTrigger id="nu-branch" className="w-full">
+                      <SelectValue placeholder="Kassir qaysi filialda ishlaydi" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branchItems.map((b) => (
+                        <SelectItem key={b.value} value={b.value}>
+                          {b.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>QR'lar shu filial qoidasi bo&apos;yicha chiqadi</FieldDescription>
+                </Field>
+              )}
             </FieldGroup>
             <DialogFooter>
               <Button

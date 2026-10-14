@@ -32,10 +32,15 @@ interface Me {
   isStaff: boolean;
 }
 
+/** POST /api/miniapp/receipts — kassir bergan vaucher QR'i natijasi */
 interface SubmitResult {
   code: string;
-  message: string;
-  receipt?: { status: string; fiscalAt: string | null; branchName: string | null; amount: number | null; couponsCount: number };
+  message?: string;
+  couponsCount?: number;
+  amount?: number;
+  branchName?: string;
+  totalCoupons?: number;
+  isStaff?: boolean;
 }
 
 type Tone = 'ok' | 'warn' | 'err';
@@ -152,16 +157,17 @@ export default function MiniApp() {
     if (!tg || busy) return;
     setSheet(null);
     if (!canScan) {
-      tg.showAlert("QR skaner faqat telefondagi Telegram'da ishlaydi. Chek rasmini botga yuboring.");
+      tg.showAlert("QR skaner faqat telefondagi Telegram'da ishlaydi. Kassir bergan QR'ni telefon kamerasi bilan skanerlang.");
       return;
     }
     // Skaner bir QR'ni ketma-ket bir necha marta yuborishi mumkin — faqat birinchisi
     let done = false;
-    tg.showScanQrPopup({ text: 'Chek pastidagi QR kodni skanerlang' }, (text) => {
+    tg.showScanQrPopup({ text: "Kassir bergan Fazo Club QR'ini skanerlang" }, (text) => {
       if (done) return true;
-      if (!/ofd\.soliq\.uz/i.test(text)) {
+      // Bizning QR (t.me/<bot>?start=v_…) yoki soliq cheki QR'i (tushuntirish uchun) — boshqasi e'tiborsiz
+      if (!/start=v_|ofd\.soliq\.uz/i.test(text)) {
         tg.HapticFeedback?.notificationOccurred('warning');
-        return false; // fiskal QR emas — skaner ochiq qoladi
+        return false; // begona QR — skaner ochiq qoladi
       }
       done = true;
       void submit(text);
@@ -257,7 +263,7 @@ export default function MiniApp() {
     ? "Xodimlar o'yinda qatnashmaydi"
     : pending > 0
       ? `${pending} ta chek tekshirilmoqda`
-      : 'Kuponlar har kuni ertalab hisoblanadi';
+      : "Kassir bergan QR'ni skanerlang — kupon darhol qo'shiladi";
 
   return root(
     <>
@@ -276,7 +282,7 @@ export default function MiniApp() {
         {me.receipts.length === 0 ? (
           <div className="empty">
             <p className="t-body">Hali chek yo&apos;q</p>
-            <p className="t-foot c-sub">Restoranda olingan chekdagi QR kodni skanerlang</p>
+            <p className="t-foot c-sub">To'lovdan keyin kassirdan Fazo Club QR'ini so'rang</p>
           </div>
         ) : (
           me.receipts.map((r) => <Row key={r.id} r={r} />)
@@ -329,31 +335,36 @@ function Row({ r }: { r: ReceiptRow }) {
 // ── Oynalar ────────────────────────────────────────────────────────────────
 
 function sheetFor(res: SubmitResult, hours: number): Sheet {
-  const r = res.receipt;
-  const where = [r?.branchName, r?.amount != null ? `${sum(r.amount)} so'm` : null].filter(Boolean).join(' · ');
+  const where = [res.branchName, res.amount != null ? `${sum(res.amount)} so'm` : null].filter(Boolean).join(' · ');
   switch (res.code) {
-    case 'ACCEPTED':
-      if (r?.status === 'APPROVED' && r.couponsCount > 0)
-        return { tone: 'ok', title: `+${r.couponsCount} kupon`, body: where };
-      if (r?.status === 'BELOW_MIN')
-        return { tone: 'warn', title: 'Summa kam', body: `${where}. Kupon uchun summa yetarli emas.` };
-      return { tone: 'ok', title: 'Chek qabul qilindi', body: `${where ? `${where}. ` : ''}Kuponlar ertaga ertalab hisoblanadi.` };
-    case 'REVIEW':
-      return { tone: 'warn', title: 'Tekshiruvga yuborildi', body: 'Natijasini botda xabar qilamiz.' };
+    case 'REDEEMED':
+      return {
+        tone: 'ok',
+        title: `+${res.couponsCount} kupon`,
+        body: res.isStaff ? `${where}. Fazo xodimlari o'yinda qatnashmaydi.` : `${where}. Jami: ${res.totalCoupons} ta kupon`,
+      };
     case 'ALREADY_YOURS':
-      return { tone: 'warn', title: "Bu chek qo'shilgan", body: 'Bitta chek faqat bir marta hisoblanadi.' };
-    case 'DUPLICATE':
-      return { tone: 'err', title: "Bu chek allaqachon qo'shilgan", body: 'Bitta chek faqat bir marta hisoblanadi.', rescan: true };
-    case 'WINDOW_EXPIRED':
-      return { tone: 'err', title: 'Chek eskirgan', body: `Faqat oxirgi ${hours} soatdagi cheklar qabul qilinadi.`, rescan: true };
-    case 'INVALID_QR':
-      return { tone: 'err', title: 'Fiskal chek emas', body: 'Chek pastidagi soliq QR kodini skanerlang.', rescan: true };
+      return { tone: 'warn', title: "Bu QR'ni ishlatgansiz", body: 'Har bir QR faqat bir marta hisoblanadi.' };
+    case 'USED':
+      return { tone: 'err', title: 'QR allaqachon ishlatilgan', body: 'Har bir QR faqat bir marta hisoblanadi.', rescan: true };
+    case 'EXPIRED':
+      return { tone: 'err', title: "QR muddati o'tgan", body: `QR ${hours} soat amal qiladi. Kassirga murojaat qiling.` };
+    case 'CANCELLED':
+      return { tone: 'err', title: 'QR bekor qilingan', body: 'Kassirga murojaat qiling.' };
+    case 'FISCAL_DISABLED':
+      return { tone: 'warn', title: 'Bu soliq cheki QR\'i', body: "Kupon uchun kassirdan Fazo Club QR'ini so'rang.", rescan: true };
+    case 'INVALID':
+      return { tone: 'err', title: 'QR yaroqsiz', body: "Kassir bergan Fazo Club QR'ini skanerlang.", rescan: true };
     case 'RATE_LIMIT':
       return { tone: 'warn', title: "Juda ko'p urinish", body: "Birozdan keyin qayta urinib ko'ring." };
+    case 'NO_CAMPAIGN':
+      return { tone: 'warn', title: "Faol aksiya yo'q", body: '' };
+    case 'BLOCKED':
+      return { tone: 'err', title: 'Akkaunt bloklangan', body: '' };
     case 'OFFLINE':
-      return { tone: 'err', title: "Internet yo'q", body: res.message, rescan: true };
+      return { tone: 'err', title: "Internet yo'q", body: res.message ?? '', rescan: true };
     default:
-      return { tone: 'err', title: 'Chek qabul qilinmadi', body: res.message };
+      return { tone: 'err', title: 'Xatolik', body: res.message ?? "Qayta urinib ko'ring.", rescan: true };
   }
 }
 
@@ -369,14 +380,14 @@ function SheetView({ sheet }: { sheet: Sheet }) {
 
 function RulesSheet({ hours, rules, onBot }: { hours: number; rules: Me['rules']; onBot: () => void }) {
   const items: Array<[React.ReactNode, string, string]> = [
-    [<IconScan key="s" />, 'Chekni skanerlang', "Fazo filialida olingan chekdagi QR kod"],
-    [<IconTime key="t" />, `${hours} soat ichida`, "Chek olingandan keyin shu vaqt ichida qo'shing"],
+    [<IconScan key="s" />, "Kassirdan QR oling", "To'lovdan keyin kassir Fazo Club QR'ini beradi"],
+    [<IconTime key="t" />, `${hours} soat ichida skanerlang`, "Telefon kamerasi yoki shu yerdagi skaner bilan"],
     [
       <IconTicket key="k" />,
       rules.couponPrice ? `Har ${sum(rules.couponPrice)} so'm — 1 kupon` : 'Summaga qarab kupon',
       rules.minSum && rules.couponPrice && rules.minSum > rules.couponPrice
-        ? `Chek kamida ${sum(rules.minSum)} so'm. Har kuni ertalab hisoblanadi`
-        : 'Kuponlar har kuni ertalab hisoblanadi',
+        ? `Chek kamida ${sum(rules.minSum)} so'm. Kupon darhol qo'shiladi`
+        : "Skanerlashingiz bilan kupon qo'shiladi",
     ],
     [<IconGift key="g" />, 'Sovrinlar', "Har oy sovg'alar, yil oxirida avtomobil"],
   ];
@@ -395,10 +406,6 @@ function RulesSheet({ hours, rules, onBot }: { hours: number; rules: Me['rules']
         ))}
       </ul>
       <div className="link-rows">
-        <button className="link-row" onClick={onBot}>
-          <span>Chek rasmini botga yuborish</span>
-          <IconChevron />
-        </button>
         <a className="link-row" href="/rules" target="_blank">
           <span>To&apos;liq qoidalar</span>
           <IconExternal />

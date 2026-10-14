@@ -58,6 +58,7 @@ export function initialsFrom(login: string): string {
 const ROLE_LABELS: Record<AdminMe['role'], string> = {
   ADMIN: 'Admin',
   OPERATOR: 'Operator',
+  CASHIER: 'Kassir',
 };
 
 /** Menyu bandi — blokdagidan balandroq, ikonka xiraroq */

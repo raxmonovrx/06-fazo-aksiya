@@ -9,10 +9,10 @@ const prisma = new PrismaClient();
 
 const RULES = [
   '"Omad Fazosi" aksiyasi qoidalari (qisqacha):',
-  '1. Fazo Group filiallarida olingan fiskal chek bilan qatnashiladi.',
-  "2. Chek 72 soat ichida botga qo'shilishi kerak.",
-  "3. Har bir filialda chek summasiga qarab kupon beriladi. Bitta chek faqat bir marta ishlatiladi.",
-  "4. Kuponlar har kuni ertalab hisoblanadi. Har oy sovg'alar, yil oxirida avtomobil o'ynaladi.",
+  "1. Fazo Group filiallarida to'lovdan keyin kassir Fazo Club QR'ini beradi.",
+  "2. QR'ni 72 soat ichida telefon kamerasi bilan skanerlang va botda «Start»ni bosing.",
+  "3. Kupon soni chek summasiga qarab filial qoidasi bo'yicha beriladi. Har bir QR faqat bir marta ishlaydi.",
+  "4. Kuponlar darhol qo'shiladi. Har oy sovg'alar, yil oxirida avtomobil o'ynaladi.",
   "5. Fazo xodimlari ro'yxatdan o'tishi mumkin, lekin o'yinda qatnashmaydi.",
 ].join('\n');
 

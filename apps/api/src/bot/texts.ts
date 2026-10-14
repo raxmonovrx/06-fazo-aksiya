@@ -14,7 +14,7 @@ export const T = {
     `Assalomu alaykum${name ? `, ${esc(name)}` : ''}! 👋\n\n` +
     `<b>Fazo Club</b> — <b>"Omad Fazosi"</b> aksiyasi.\n` +
     `Ovqatlan — mashina yut! 🚗\n\n` +
-    `Fazo filiallaridagi har bir fiskal chek uchun kupon oling. ` +
+    `Fazo filiallarida to'lovdan keyin kassir QR beradi — uni skanerlab kupon olasiz. ` +
     `Har oy sovg'alar, yil oxirida esa avtomobil o'ynaladi.\n\n` +
     `Boshlash uchun telefon raqamingizni yuboring 👇`,
 
@@ -29,7 +29,8 @@ export const T = {
 
   home: (name?: string | null) =>
     `${name ? `${esc(name)}, ` : ''}Fazo Club'ga xush kelibsiz! 🎉\n\n` +
-    `Chek QR kodini skanerlang va kupon oling: har oy sovg'alar, yil oxirida avtomobil 🚗`,
+    `Kassir bergan QR'ni telefon kamerasi bilan skanerlang — kupon darhol qo'shiladi. ` +
+    `Har oy sovg'alar, yil oxirida avtomobil 🚗`,
 
   inviteShare: "Fazo'da ovqatlaning, chekdagi QR kodni skanerlang — oylik sovg'alar va yil oxirida avtomobil o'yini 🚗",
 
