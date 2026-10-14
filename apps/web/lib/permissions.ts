@@ -7,12 +7,9 @@ export type Permission =
   | 'cashier'
   | 'vouchers'
   | 'vouchers.cancel'
-  | 'moderation'
-  | 'receipts'
   | 'participants'
   | 'participants.edit'
   | 'branches'
-  | 'import'
   | 'staff'
   | 'export'
   | 'settings'
@@ -34,11 +31,9 @@ export const PERMISSION_GROUPS: Array<{
     ],
   },
   {
-    title: 'Cheklar va mijozlar',
+    title: 'Mijozlar',
     items: [
       { value: 'dashboard', label: 'Dashboard', hint: 'Umumiy statistika' },
-      { value: 'moderation', label: 'Moderatsiya', hint: 'Cheklarni tasdiqlash va rad etish' },
-      { value: 'receipts', label: 'Cheklar', hint: "Barcha cheklar ro'yxati" },
       { value: 'participants', label: 'Ishtirokchilar', hint: "Ro'yxat va kuponlar" },
       { value: 'participants.edit', label: 'Ishtirokchini bloklash', hint: "Bloklash va xodim deb belgilash" },
     ],
@@ -46,8 +41,7 @@ export const PERMISSION_GROUPS: Array<{
   {
     title: 'Boshqaruv',
     items: [
-      { value: 'branches', label: 'Filiallar va kassalar', hint: 'Filial qoidalari, FM, kassa qurilmalari' },
-      { value: 'import', label: 'Import', hint: 'iiko/Excel savdolarini yuklash' },
+      { value: 'branches', label: 'Filiallar va kassalar', hint: 'Kupon qoidasi, chek ko\'rinishi, terminallar' },
       { value: 'staff', label: 'Xodimlar ro\'yxati', hint: "Aksiyada qatnasha olmaydigan raqamlar" },
       { value: 'export', label: 'Eksport', hint: 'Excel yuklab olish' },
       { value: 'settings', label: 'Aksiya sozlamalari', hint: 'Sana, qoidalar matni' },
@@ -76,8 +70,8 @@ export const ROLES: Array<{ value: AdminRole; label: string; description: string
   {
     value: 'OPERATOR',
     label: 'Operator',
-    description: 'Cheklar, moderatsiya va ishtirokchilar',
-    template: ['dashboard', 'vouchers', 'moderation', 'receipts', 'participants'],
+    description: 'Dashboard, vaucherlar va ishtirokchilar',
+    template: ['dashboard', 'vouchers', 'participants'],
     needsBranch: false,
   },
   {

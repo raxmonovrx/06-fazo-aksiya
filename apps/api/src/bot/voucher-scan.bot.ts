@@ -1,25 +1,26 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import type { Bot, Context } from 'grammy';
+import type { Bot } from 'grammy';
 
-import { BotService } from '../bot/bot.service.js';
+import { BotService } from './bot.service.js';
 import { config } from '../config.js';
 import { BOT } from '../telegram/bot.token.js';
-import { decodeQrFromImage } from './qr-decode.js';
 import { parseVoucherToken } from '../core/voucher-token.js';
 import { FISCAL_DISABLED, PHOTO_NO_QR } from '../vouchers/voucher-texts.js';
-import { ReceiptsService, type SubmitResult } from './receipts.service.js';
+import { decodeQrFromImage } from './qr-decode.js';
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
-/** Botga yuborilgan chek rasmi (zaxira 1) va matn ko'rinishidagi QR havola. */
+/**
+ * Kamerasiz yo'l: kassa QR'ining rasmi yoki havolasi botga yuborilsa — kupon qo'shiladi.
+ * Soliq cheki QR'i yuborilsa — kassirdan Fazo Group QR'ini so'rash aytiladi.
+ */
 @Injectable()
-export class ReceiptsBotHandlers implements OnModuleInit {
-  private readonly log = new Logger(ReceiptsBotHandlers.name);
+export class VoucherScanHandlers implements OnModuleInit {
+  private readonly log = new Logger(VoucherScanHandlers.name);
 
   constructor(
     @Inject(BOT) private readonly bot: Bot,
     private readonly botService: BotService,
-    private readonly receipts: ReceiptsService,
   ) {}
 
   onModuleInit() {
@@ -45,7 +46,6 @@ export class ReceiptsBotHandlers implements OnModuleInit {
           } catch (e) {
             this.log.error(`Rasm yuklab olinmadi/o'qilmadi: ${(e as Error).message}`);
           }
-          // Asosiy oqim — kassir bergan vaucher QR'i (2026-10-14 dan). Fiskal QR o'chirilgan.
           const token = parseVoucherToken(text);
           if (token) return this.botService.redeemAndReply(ctx, p, token);
           if (text && /ofd\.soliq\.uz/i.test(text)) return ctx.reply(FISCAL_DISABLED, { parse_mode: 'HTML' });
@@ -53,7 +53,7 @@ export class ReceiptsBotHandlers implements OnModuleInit {
         }),
       );
 
-      // Matn ko'rinishidagi havola: vaucher yoki (o'chirilgan) fiskal QR
+      // Matn ko'rinishidagi havola: vaucher yoki soliq cheki QR'i
       pm.hears(/t\.me\/\S+start=v_|ofd\.soliq\.uz\/\S+/i, (ctx) =>
         this.botService.withParticipant(ctx, async (p) => {
           const text = ctx.message!.text!;
@@ -63,10 +63,6 @@ export class ReceiptsBotHandlers implements OnModuleInit {
         }),
       );
     });
-  }
-
-  private replyResult(ctx: Context, res: SubmitResult) {
-    return ctx.reply(res.message);
   }
 
   private async download(fileId: string): Promise<Buffer> {

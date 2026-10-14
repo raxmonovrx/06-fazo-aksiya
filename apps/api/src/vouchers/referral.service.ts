@@ -104,7 +104,6 @@ export class ReferralService {
           branchId,
           couponsCount: give,
           decidedAt: now,
-          notifiedAt: now,
         },
       });
       await tx.coupon.createMany({

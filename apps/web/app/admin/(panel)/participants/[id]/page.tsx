@@ -8,12 +8,12 @@ import {
   RiFileCopyLine,
   RiForbidLine,
   RiMore2Fill,
-  RiReceiptLine,
   RiShieldCheckLine,
   RiTelegramLine,
   RiUserAddLine,
   RiUserForbidLine,
   RiUserStarLine,
+  RiQrCodeLine,
 } from '@remixicon/react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -21,13 +21,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { DataTableCard } from '@/components/admin/data-table';
-import {
-  ErrorAlert,
-  InfoList,
-  StatCard,
-  StatusBadge,
-  useLoad,
-} from '@/components/admin/kit';
+import { ErrorAlert, InfoList, StatCard, useLoad } from '@/components/admin/kit';
 import { Dot, EmptyState, PageContainer } from '@/components/admin/layout';
 import { usePageHeader } from '@/components/page-header';
 import {
@@ -43,13 +37,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,7 +54,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { adminApi, qs } from '@/lib/api';
+import { adminApi } from '@/lib/api';
 import { fmtDate, fmtPhone, fmtShort, fmtSum } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { can, useAdmin } from '../../admin-context';
@@ -83,7 +71,6 @@ interface Detail {
   startPayload: string | null;
   isStaff: boolean;
   isBlocked: boolean;
-  botBlockedAt: string | null;
   rulesAcceptedAt: string | null;
   createdAt: string;
   referredBy: {
@@ -95,6 +82,7 @@ interface Detail {
   coupons: { eligible: number; ineligible: number };
   receipts: Array<{
     id: number;
+    source: 'VOUCHER' | 'REFERRAL' | string;
     status: string;
     fiscalAt: string | null;
     receiptNumber: string | null;
@@ -231,7 +219,6 @@ export default function ParticipantPage() {
     }
   };
   const who = p.phone ?? (name || `#${p.id}`);
-  const openReceipt = (rid: number) => router.push(`/admin/receipts/${rid}`);
 
   return (
     <PageContainer size="wide">
@@ -309,19 +296,6 @@ export default function ParticipantPage() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            {p.phone && (
-              <Button
-                variant="outline"
-                size="sm"
-                nativeButton={false}
-                render={
-                  <Link href={`/admin/receipts${qs({ phone: p.phone })}`} />
-                }
-              >
-                <RiReceiptLine data-icon="inline-start" />
-                Cheklari
-              </Button>
-            )}
             {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger
@@ -438,14 +412,14 @@ export default function ParticipantPage() {
         <StatCard
           label="O'yindan tashqari"
           value={p.coupons.ineligible}
-          sub="tasdiqlanmagan / xodim"
+          sub="xodim — o'yinda emas"
           icon={RiUserForbidLine}
         />
         <StatCard
-          label="Cheklar"
-          value={p.receipts.length}
-          sub={p.receipts.length >= 100 ? 'oxirgi 100 tasi' : 'jami yuborilgan'}
-          icon={RiReceiptLine}
+          label="Skanerlangan QR"
+          value={p.receipts.filter((r) => r.source === 'VOUCHER').length}
+          sub={`taklif bonusi: ${p.receipts.filter((r) => r.source === 'REFERRAL').length}`}
+          icon={RiQrCodeLine}
         />
         <StatCard
           label="Taklif qilganlari"
@@ -456,78 +430,40 @@ export default function ParticipantPage() {
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        {/* Cheklar */}
+        {/* Kuponlar tarixi: kassa QR'lari va taklif bonuslari */}
         <div className="grid min-w-0 gap-2">
           <div className="flex items-center justify-between px-0.5">
-            <h2 className="text-sm font-semibold">Cheklar</h2>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {p.receipts.length} ta
-            </span>
+            <h2 className="text-sm font-semibold">Kuponlar tarixi</h2>
+            <span className="text-xs text-muted-foreground tabular-nums">{p.receipts.length} ta</span>
           </div>
           <DataTableCard>
             {!p.receipts.length ? (
-              <EmptyState
-                icon={RiReceiptLine}
-                title="Cheklar yo'q"
-                description="Bu ishtirokchi hali chek yubormagan."
-              />
+              <EmptyState icon={RiQrCodeLine} title="Hali kupon yo'q" description="Bu ishtirokchi hali QR skanerlamagan." />
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="pl-4">Chek</TableHead>
+                    <TableHead className="pl-4">Manba</TableHead>
                     <TableHead>Filial</TableHead>
-                    <TableHead>Status</TableHead>
                     <TableHead className="text-right">Summa</TableHead>
                     <TableHead className="pr-4 text-right">Kupon</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {p.receipts.map((r) => (
-                    <TableRow
-                      key={r.id}
-                      tabIndex={0}
-                      className="cursor-pointer hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
-                      onClick={() => openReceipt(r.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') openReceipt(r.id);
-                      }}
-                    >
+                    <TableRow key={r.id}>
                       <TableCell className="pl-4">
                         <div className="flex items-baseline gap-2">
-                          <span className="font-medium tabular-nums">
-                            #{r.id}
-                          </span>
-                          {r.receiptNumber && (
-                            <span className="font-mono text-xs text-muted-foreground">
-                              №{r.receiptNumber}
-                            </span>
+                          <span className="font-medium">{r.source === 'REFERRAL' ? 'Taklif bonusi' : 'Kassa QR'}</span>
+                          {r.source === 'VOUCHER' && r.receiptNumber && (
+                            <span className="font-mono text-xs text-muted-foreground">#{r.receiptNumber.replace(/^V/, '')}</span>
                           )}
                         </div>
-                        <div className="text-xs text-muted-foreground tabular-nums">
-                          {fmtShort(r.fiscalAt ?? r.createdAt)}
-                        </div>
+                        <div className="text-xs text-muted-foreground tabular-nums">{fmtShort(r.createdAt)}</div>
                       </TableCell>
-                      <TableCell>
-                        {r.branch?.name ?? (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={r.status} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {fmtSum(r.amount)}
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          'pr-4 text-right font-semibold tabular-nums',
-                          !r.couponsCount &&
-                            'font-normal text-muted-foreground',
-                        )}
-                      >
-                        {r.couponsCount || '—'}
-                      </TableCell>
+                      <TableCell>{r.branch?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.amount ? fmtSum(r.amount) : '—'}</TableCell>
+                      <TableCell className="pr-4 text-right font-semibold tabular-nums">{r.couponsCount}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -571,20 +507,6 @@ export default function ParticipantPage() {
                       </Link>
                     ) : (
                       <span className="text-muted-foreground">—</span>
-                    ),
-                  },
-                  {
-                    label: 'Botni bloklagan',
-                    value: p.botBlockedAt ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Dot className="bg-red-500" />
-                        {fmtDate(p.botBlockedAt)}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                        <Dot className="bg-emerald-500" />
-                        yo&apos;q
-                      </span>
                     ),
                   },
                   {

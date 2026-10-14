@@ -5,9 +5,8 @@ import { z } from 'zod';
 import { CampaignService } from '../campaign/campaign.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ParticipantsService } from '../participants/participants.service.js';
-import { RateLimiter } from '../receipts/rate-limiter.js';
+import { RateLimiter } from '../core/rate-limiter.js';
 import { parseVoucherToken } from '../core/voucher-token.js';
-import { ReceiptsService } from '../receipts/receipts.service.js';
 import { VouchersService } from '../vouchers/vouchers.service.js';
 import { BOT } from '../telegram/bot.token.js';
 import { MiniappGuard, type MiniappRequest } from './miniapp.guard.js';
@@ -21,7 +20,6 @@ export class MiniappController {
 
   constructor(
     @Inject(BOT) private readonly bot: Bot,
-    private readonly receipts: ReceiptsService,
     private readonly participants: ParticipantsService,
     private readonly campaigns: CampaignService,
     private readonly prisma: PrismaService,
@@ -33,7 +31,23 @@ export class MiniappController {
     const p = req.participant;
     const [summary, receipts, campaign, branches] = await Promise.all([
       this.participants.summary(p.id),
-      this.receipts.listForParticipant(p.id),
+      // Kupon yozuvlari: kassa QR'i (VOUCHER) va taklif bonusi (REFERRAL)
+      this.prisma.receipt.findMany({
+        where: { participantId: p.id },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        select: {
+          id: true,
+          status: true,
+          fiscalAt: true,
+          receiptNumber: true,
+          amount: true,
+          couponsCount: true,
+          source: true,
+          createdAt: true,
+          branch: { select: { name: true } },
+        },
+      }),
       this.campaigns.getActive(),
       this.prisma.branch.findMany({ where: { isActive: true }, select: { minSum: true, couponPrice: true } }),
     ]);
@@ -58,10 +72,7 @@ export class MiniappController {
     };
   }
 
-  /**
-   * Skaner natijasi. 2026-10-14 dan asosiy oqim — kassir bergan vaucher QR'i
-   * (t.me/<bot>?start=v_<token>). Fiskal chek QR'i o'chirilgan.
-   */
+  /** Skaner natijasi: kassir bergan QR (t.me/<bot>?start=v_<token>). Soliq cheki QR'i qabul qilinmaydi. */
   @Post('receipts')
   @HttpCode(200)
   async submit(@Req() req: MiniappRequest, @Body() body: unknown) {
@@ -76,14 +87,14 @@ export class MiniappController {
     return { code: 'INVALID' };
   }
 
-  /** "Chek rasmini botga yuborish": bot chatga yo'riqnoma yuboradi, mini app esa yopiladi. */
+  /** "QR rasmini botga yuborish": bot chatga yo'riqnoma yuboradi, mini app esa yopiladi. */
   @Post('photo-hint')
   @HttpCode(200)
   async photoHint(@Req() req: MiniappRequest) {
     const p = req.participant;
     if (this.hintLimiter.hit(String(p.id))) {
       await this.bot.api
-        .sendMessage(Number(p.tgId), "📷 Chekning rasmini shu yerga yuboring.\nQR kod aniq va to'liq ko'rinsin.")
+        .sendMessage(Number(p.tgId), "📷 Kassir bergan QR'ning rasmini shu yerga yuboring.\nQR aniq va to'liq ko'rinsin.")
         .catch(() => undefined);
     }
     return { ok: true };

@@ -8,12 +8,10 @@ import {
 } from '@remixicon/react';
 import { useCallback, useEffect, useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TableCell, TableRow } from '@/components/ui/table';
-import { STATUS } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 /*
@@ -49,33 +47,6 @@ export function PageToolbar({
         <div className="flex flex-wrap items-center gap-2">{children}</div>
       )}
     </div>
-  );
-}
-
-/** Status nuqtasi rangi — belgi o'zi neytral (outline), rang faqat nuqtada */
-export const STATUS_DOT: Record<string, string> = {
-  PENDING: 'bg-amber-500',
-  APPROVED: 'bg-emerald-500',
-  BELOW_MIN: 'bg-zinc-400',
-  REJECTED: 'bg-red-500',
-  NOT_FOUND: 'bg-orange-500',
-  NEEDS_REVIEW: 'bg-sky-500',
-};
-
-/** Chek statusi — chegarali belgi, oldida rangli nuqta */
-export function StatusBadge({ status }: { status: string }) {
-  const s = STATUS[status];
-  return (
-    <Badge variant="outline" className="gap-1.5 font-normal">
-      <span
-        aria-hidden
-        className={cn(
-          'size-1.5 rounded-full',
-          STATUS_DOT[status] ?? 'bg-muted-foreground',
-        )}
-      />
-      {s?.label ?? status}
-    </Badge>
   );
 }
 

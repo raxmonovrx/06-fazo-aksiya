@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  RiArrowRightUpLine,
-  RiMore2Fill,
-  RiReceiptLine,
-  RiUserSearchLine,
-} from '@remixicon/react';
+import { RiArrowRightUpLine, RiMore2Fill, RiUserSearchLine } from '@remixicon/react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
@@ -201,7 +196,7 @@ function ParticipantsTable() {
               <TableHead className="pl-4">Ishtirokchi</TableHead>
               <TableHead className="hidden md:table-cell">Telegram</TableHead>
               <TableHead>Ro&apos;yxatdan o&apos;tgan</TableHead>
-              <TableHead className="text-right">Cheklar</TableHead>
+              <TableHead className="text-right">QR</TableHead>
               <TableHead className="text-right">Kuponlar</TableHead>
               <TableHead className="w-12 pr-4" />
             </TableRow>
@@ -393,18 +388,6 @@ function ParticipantsTable() {
                             <RiArrowRightUpLine />
                             Ochish
                           </DropdownMenuItem>
-                          {p.phone && (
-                            <DropdownMenuItem
-                              render={
-                                <Link
-                                  href={`/admin/receipts${qs({ phone: p.phone })}`}
-                                />
-                              }
-                            >
-                              <RiReceiptLine />
-                              Cheklarini ko&apos;rish
-                            </DropdownMenuItem>
-                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

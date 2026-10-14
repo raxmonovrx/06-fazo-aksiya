@@ -1,6 +1,6 @@
 # Fazo Group — “KIA SONET MENIKI” aksiya tizimi
 
-Mijoz Telegram botda ro'yxatdan o'tadi va Fazo filiallaridan olgan fiskal chekining QR kodini skanerlaydi. Chek iiko savdo ma'lumoti bilan solishtiriladi, keyin filial qoidasi bo'yicha kupon beriladi.
+Kassir admin panelning **Kassa** sahifasida chek summasini kiritadi va bir martalik QR chiqaradi: QR chop etiladi yoki ekranda ko'rsatiladi. Mijoz QR'ni telefon kamerasi bilan skanerlaydi, bot ochiladi va kuponlar darhol qo'shiladi. Tizim mustaqil ishlaydi: iiko, fiskal chek yoki boshqa tizimga bog'liq emas.
 
 - Bot: [@FazoClub_bot](https://t.me/FazoClub_bot)
 - Mini app: `https://club.fazorestaurant.uz/miniapp`
@@ -12,34 +12,29 @@ Texnik topshiriq [SPEC.md](SPEC.md) da. Infratuzilma konteksti [FAZO_AKSIYA_CONT
 ## Tuzilma
 
 ```
-apps/api     NestJS 12 + Prisma 6 + grammY (bot, webhook), cron'lar
-  src/core       sof funksiyalar: QR parser, kupon formulasi, moslash, initData
-  src/receipts   chek qo'shish (mini app, rasm, matn), rate limit
-  src/reconcile  solishtirish, Excel/CSV import
-  src/iiko       iikoServer OLAP (IikoSource)
-  src/jobs       03:15 solishtirish, 09:00 bildirishnomalar
-  src/admin      admin API (auth, cheklar, filiallar, import, eksport…)
+apps/api     NestJS 12 + Prisma 6 + grammY (bot, webhook)
+  src/core       sof funksiyalar: kupon formulasi, vaucher tokeni, telefon, initData, chek matnlari
+  src/vouchers   QR chiqarish/skanerlash, firibgarlik belgilari, taklif bonusi
+  src/bot        ro'yxatdan o'tish, bosh xabar, QR rasmi/havolasi
+  src/miniapp    mini app API (kuponlar, skaner)
+  src/admin      admin API (auth/RBAC, filiallar, terminallar, chek logosi, ishtirokchilar, eksport…)
 apps/web     Next.js 16: /miniapp, /rules, /admin
-tools/       deploy.sh, iiko-columns.mjs
+tools/       deploy.sh
 infra/       nginx konfiguratsiyasi
 ```
 
-## Chek qanday ishlaydi
+## QR qanday ishlaydi
 
-1. Mijoz QR'ni skanerlaydi. U `https://ofd.soliq.uz/check?t=FM&r=chek&c=vaqt&s=belgi` ko'rinishida bo'ladi. QR ichida summa yo'q.
-2. Server QR'ni tekshiradi va chekka status beradi:
-   - FM `FiscalDevice` da bo'lsa: **PENDING**.
-   - FM noma'lum bo'lsa: **NEEDS_REVIEW** va admin guruhiga alert boradi. Admin FM'ni filialga bog'lagach, chek o'zi qayta ishlanadi.
-   - Chek aksiyadan oldin chiqqan yoki 72 soatdan eski bo'lsa: **REJECTED**. Sababi mijozga darhol aytiladi.
-   - Shu chek allaqachon qo'shilgan bo'lsa: "allaqachon qo'shilgan".
-3. Har kuni 03:15 da iiko'dan savdo olinadi (yoki admin Excel yuklaydi). Chek `(FM, chek raqami)` bo'yicha, vaqt farqi ±10 daqiqa ichida bo'lsa moslanadi:
-   - topilsa, summaga qarab **APPROVED** (kuponlar yaratiladi) yoki **BELOW_MIN**;
-   - qaytarilgan (refund) chek bo'lsa, **REJECTED** va kuponlari o'yindan chiqadi;
-   - 3 kundan keyin ham topilmasa, **NOT_FOUND** va moderatsiyaga tushadi.
-4. Har kuni 09:00 da mijozga bitta xabar boradi: kecha nechta kupon qo'shilgani va jami kuponlari.
+1. Kassir summani kiritadi va terminal tugmasini bosadi. Server tasodifiy token bilan bir martalik QR yaratadi: `t.me/FazoClub_bot?start=v_<token>`. Summa va kupon soni serverda saqlanadi, QR'ni soxtalashtirib bo'lmaydi.
+2. QR terminal sozlamasiga qarab chop etiladi (80/58 mm termoprinter) yoki ekranda katta ko'rsatiladi. Chekdagi logo va matnlarni admin filial bo'yicha sozlaydi.
+3. Mijoz QR'ni skanerlaydi. Ro'yxatdan o'tmagan bo'lsa, bitta xabarda raqam so'raladi: raqamni yuborish qoidalarga rozilik hisoblanadi. Shundan keyin kuponlar qo'shiladi.
+4. QR bir martalik va aksiya sozlamasidagi muddat (standart 72 soat) ichida amal qiladi. Admin yoki kassir uni bekor qila oladi.
+5. Skanerlagan akkaunt (telefon, Telegram ID, ism) muhrlanadi. Xodim skanerlasa yoki bitta kassir bitta odamga ko'p QR bersa, admin guruhiga alert boradi.
 
 Kupon formulasi: `sum < minSum → 0`, aks holda `min(max(1, floor(sum / couponPrice)), maxPerReceipt)`. Qoida har filial uchun alohida, admin paneldan o'zgartiriladi.
 Kuponlar ketma-ket raqamlanadi. Xodimlarning kuponlari `eligible=false` bo'ladi, ya'ni o'yinda qatnashmaydi.
+
+**Taklif bonusi:** havola orqali kelgan do'st birinchi QR'ini skanerlasa, taklif qilganga bonus kupon beriladi (Sozlamalarda yoqiladi, oylik chegara bor).
 
 ## Lokal ishga tushirish
 
@@ -92,8 +87,6 @@ To'liq ro'yxat [.env.example](.env.example) da. Asosiylari:
 | `ADMIN_INIT_LOGIN/PASSWORD` | Birinchi ishga tushishda shu ma'lumot bilan ADMIN yaratiladi |
 | `POSTGRES_PASSWORD` | Prod Postgres paroli |
 | `SUPPORT_CONTACT` | Botdagi "☎️ Aloqa" tugmasida ko'rinadi |
-| `IIKO_SERVERS` | Ixtiyoriy. `[{"host":"https://fazo-co.iiko.it","login":"..","password":".."}, …]` |
-| `IIKO_FIELDS` | Ixtiyoriy. OLAP ustun nomlari: `{"receiptNumber":"..","fm":"..","closedAt":"CloseTime","amount":"DishDiscountSumInt","refund":".."}` |
 
 ## Deploy (server: `ssh fazo`)
 
@@ -142,46 +135,25 @@ ssh fazo 'cd /opt/fazo-club && docker compose exec postgres psql -U fazo fazo_cl
 
 RestoBrain admin menyusiga "Fazo Group" tashqi havolasini qo'shing (`https://club.fazorestaurant.uz/admin`). Kirish shu servisning o'z login/paroli bilan bo'ladi.
 
-## iiko ulash
+## Admin uchun qisqa qo'llanma
 
-1. Fiskal ustunlarni toping. **RestoBrain sinxroni ishlamaydigan va iikoOffice'da shu login bilan hech kim ishlamayotgan paytda** ishga tushiring:
+**Filiallar va kassalar** → filial:
+- *Kupon*: minimal chek, 1 kupon narxi, bitta chekka ko'pi bilan kupon.
+- *Chek*: logo (istalgan rasm, avtomatik oq-qora) va matnlar, namunasi bilan.
+- *Terminallar*: har bir kassa (kompyuter, Sunmi) uchun tugma — printer 80/58 mm yoki ekranda.
 
-   ```bash
-   IIKO_HOST=https://fazo-co.iiko.it IIKO_LOGIN=.. IIKO_PASSWORD=.. node tools/iiko-columns.mjs 2026-10-11 "Fazo Family Restauraunt"
-   ```
+**Foydalanuvchilar**: kassir va menejerlarni yaratish, filialga biriktirish, bo'limlarga ruxsat.
 
-2. Topilgan ustun nomlarini `IIKO_FIELDS` ga, serverlarni `IIKO_SERVERS` ga yozing va deploy qiling.
-3. Admin paneldagi Filiallar sahifasida har filialning `iiko department` va `iiko server` maydonlari to'ldirilgan bo'lishi kerak.
+**Vaucherlar**: barcha QR — kim chiqardi, kim skanerladi, shubhali belgilar, bekor qilish.
 
-iiko ishlamasa ham tizim to'xtamaydi: Excel import har doim ishlaydi.
+**Ishtirokchilar**: kuponlar tarixi, bloklash, xodim deb belgilash, o'chirish (faqat admin).
 
-## Operator uchun qisqa qo'llanma
+**Xodimlar**: telefonlar ro'yxatini (CSV) joylang — ular kupon oladi, lekin o'yinda qatnashmaydi.
 
-**Moderatsiya** (har kuni)
-1. Admin panel → 👀 Moderatsiya. Bu yerda QR'i o'qilmagan rasmlar, noma'lum kassalar va iiko'da topilmagan cheklar turadi.
-2. Chekni oching, rasm va "iiko ma'lumoti" jadvaliga qarang. Jadvaldagi qatorni bossangiz, summa formaga tushadi.
-3. **Tasdiqlash**: summa va filialni kiriting. Rasm orqali kelgan chekda FM va chek raqamini ham yozing, shunda chek ikkinchi marta ishlatilmaydi.
-4. **Rad etish**: sababini tanlang yoki yozing. Sabab mijozga ertalabki xabarda boradi.
-
-**Excel import** (iiko API ishlamasa)
-1. iikoOffice → Отчеты → OLAP-отчет по продажам. Ustunlar: fiskal chek raqami, FM yoki kassa, yopilish vaqti, chegirmadan keyingi summa. Kerakli kunlarni Excel'ga chiqaring.
-2. Admin → 📥 Import → faylni yuklang → ustunlarni tekshiring (birinchi safar tanlaganingiz eslab qolinadi) → "Import qilish va solishtirish".
-3. Faylni qayta yuklash xavfsiz, takror yozuv yaratilmaydi.
-
-**Yangi kassa (FM)**
-- Admin → 🏢 Filiallar → filial ostidagi "FM qo'shish". Noma'lum FM'lar shu sahifaning yuqorisida chiqadi. Filialni tanlasangiz, kutayotgan cheklar avtomatik qayta ishlanadi.
-
-**Chekni qo'lda kiritish**
-- Admin → 🧾 Cheklar → "Qo'lda qo'shish". Kerak: telefon, FM, chek raqami va vaqt. Summa kiritilsa, chek darhol tasdiqlanadi.
-
-**Xodimlar**
-- Admin → 🧑‍🍳 Xodimlar → telefonlar ro'yxatini (CSV) joylang. Ro'yxatdagi telefon bilan ro'yxatdan o'tganlarning kuponlari o'yindan chiqadi.
-
-**Eksport**: Admin → 📤 Eksport → ishtirokchilar, kuponlar yoki cheklar (XLSX/CSV).
+**Eksport**: ishtirokchilar, kuponlar va vaucherlar (XLSX/CSV).
 
 ## Admin guruhiga keladigan alert'lar
 
-- Noma'lum FM'dan chek keldi (har FM uchun soatiga bir marta).
-- Shubhali faollik: bitta telefon bir kunda 5 tadan ko'p chek qo'shdi yoki bitta kassadan bir soatda 40 tadan ko'p chek keldi.
-- iiko import yoki solishtirish xatosi.
-- Har kuni 09:00 da kechagi kun bo'yicha qisqa hisobot.
+- Xodim QR skanerladi.
+- Bitta kassir bir kunda bitta odamga 3 va undan ko'p QR berdi.
+- Bitta odam bir kunda 5 va undan ko'p QR skanerladi.

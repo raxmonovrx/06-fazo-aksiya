@@ -30,7 +30,7 @@ export default async function RulesPage() {
       <h1 className="mb-1 text-2xl font-bold">&ldquo;{c.name}&rdquo; aksiyasi qoidalari</h1>
       <p className="mb-6 text-sm text-neutral-500">
         Boshlanish: {fmtDate(c.startsAt, false)}
-        {c.endsAt && ` · Tugash: ${fmtDate(c.endsAt, false)}`} · Chekni {c.receiptWindowHours} soat ichida qo&apos;shing
+        {c.endsAt && ` · Tugash: ${fmtDate(c.endsAt, false)}`} · QR&apos;ni {c.receiptWindowHours} soat ichida skanerlang
       </p>
       <div className="whitespace-pre-line rounded-xl bg-neutral-50 p-4">{c.rulesText}</div>
 

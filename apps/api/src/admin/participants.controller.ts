@@ -105,8 +105,6 @@ export class ParticipantsController {
       const receipts = (await tx.receipt.findMany({ where: { participantId: id }, select: { id: true } })).map((r) => r.id);
       await tx.voucher.updateMany({ where: { OR: [{ redeemedById: id }, { receiptId: { in: receipts } }] }, data: { redeemedById: null, receiptId: null } });
       const coupons = await tx.coupon.deleteMany({ where: { OR: [{ participantId: id }, { receiptId: { in: receipts } }] } });
-      await tx.notification.deleteMany({ where: { participantId: id } });
-      await tx.scanLog.deleteMany({ where: { participantId: id } });
       await tx.receipt.deleteMany({ where: { id: { in: receipts } } });
       await tx.participant.updateMany({ where: { referredById: id }, data: { referredById: null } });
       await tx.participant.delete({ where: { id } });

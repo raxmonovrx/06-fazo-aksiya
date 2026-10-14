@@ -22,18 +22,18 @@ export class ExportController {
   @Get(':kind')
   async export(@Param('kind') kind: string, @Res() res: Response, @CurrentAdmin() admin: AdminUser) {
     const [name, ext] = kind.split('.');
-    if (!['participants', 'coupons', 'receipts'].includes(name) || !['xlsx', 'csv'].includes(ext)) throw new NotFoundException();
+    if (!['participants', 'coupons', 'vouchers'].includes(name) || !['xlsx', 'csv'].includes(ext)) throw new NotFoundException();
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet(name);
     if (name === 'participants') await this.participants(ws);
     else if (name === 'coupons') await this.coupons(ws);
-    else await this.receipts(ws);
+    else await this.vouchers(ws);
     ws.getRow(1).font = { bold: true };
     ws.views = [{ state: 'frozen', ySplit: 1 }];
 
     const stamp = formatTashkent(new Date(), false).split('.').reverse().join('-');
-    res.setHeader('Content-Disposition', `attachment; filename="fazo-club-${name}-${stamp}.${ext}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="fazo-group-${name}-${stamp}.${ext}"`);
     if (ext === 'csv') {
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.write('﻿'); // Excel UTF-8 ni to'g'ri ochsin
@@ -60,7 +60,7 @@ export class ExportController {
       { header: 'Xodim', key: 'isStaff', width: 7 },
       { header: 'Bloklangan', key: 'isBlocked', width: 10 },
       { header: "Ro'yxatdan o'tgan", key: 'registered', width: 17 },
-      { header: 'Cheklar', key: 'receipts', width: 8 },
+      { header: 'Skanerlagan QR', key: 'receipts', width: 10 },
       { header: 'Kuponlar (o\'yinda)', key: 'coupons', width: 10 },
     ];
     const rows = await this.prisma.participant.findMany({
@@ -87,10 +87,8 @@ export class ExportController {
       { header: 'Telefon', key: 'phone', width: 16 },
       { header: 'Ism', key: 'name', width: 22 },
       { header: 'Filial', key: 'branch', width: 18 },
-      { header: 'Chek ID', key: 'receiptId', width: 8 },
-      { header: 'FM', key: 'fm', width: 17 },
-      { header: 'Chek raqami', key: 'receiptNumber', width: 10 },
-      { header: 'Chek vaqti', key: 'fiscalAt', width: 17 },
+      { header: 'Manba', key: 'source', width: 14 },
+      { header: 'QR №', key: 'receiptNumber', width: 8 },
       { header: 'Summa', key: 'amount', width: 12 },
       { header: 'Berilgan', key: 'createdAt', width: 17 },
     ];
@@ -98,7 +96,7 @@ export class ExportController {
       orderBy: { id: 'asc' },
       include: {
         participant: { select: { phone: true, firstName: true, lastName: true } },
-        receipt: { select: { fm: true, receiptNumber: true, fiscalAt: true, amount: true, branch: { select: { name: true } } } },
+        receipt: { select: { source: true, receiptNumber: true, amount: true, branch: { select: { name: true } } } },
       },
     });
     for (const c of rows) {
@@ -108,44 +106,55 @@ export class ExportController {
         phone: c.participant.phone,
         name: [c.participant.firstName, c.participant.lastName].filter(Boolean).join(' '),
         branch: c.receipt.branch?.name ?? '',
-        receiptId: c.receiptId,
-        fm: c.receipt.fm,
+        source: c.receipt.source === 'REFERRAL' ? 'Taklif bonusi' : 'Kassa QR',
+        // "V12" → 12 (QR raqami), taklif bonusida — do'st ID'si
         receiptNumber: c.receipt.receiptNumber,
-        fiscalAt: dt(c.receipt.fiscalAt),
         amount: c.receipt.amount ? Number(c.receipt.amount) : null,
         createdAt: dt(c.createdAt),
       });
     }
   }
 
-  private async receipts(ws: ExcelJS.Worksheet) {
+  private async vouchers(ws: ExcelJS.Worksheet) {
     ws.columns = [
-      { header: 'ID', key: 'id', width: 8 },
-      { header: 'Status', key: 'status', width: 13 },
-      { header: 'Sabab', key: 'rejectReason', width: 30 },
-      { header: 'Manba', key: 'source', width: 8 },
-      { header: 'Telefon', key: 'phone', width: 16 },
+      { header: 'QR №', key: 'id', width: 8 },
+      { header: 'Holat', key: 'status', width: 14 },
       { header: 'Filial', key: 'branch', width: 18 },
-      { header: 'FM', key: 'fm', width: 17 },
-      { header: 'Chek raqami', key: 'receiptNumber', width: 10 },
-      { header: 'Chek vaqti', key: 'fiscalAt', width: 17 },
+      { header: 'Terminal', key: 'terminal', width: 14 },
+      { header: 'Kassir', key: 'cashier', width: 14 },
       { header: 'Summa', key: 'amount', width: 12 },
-      { header: 'Kuponlar', key: 'couponsCount', width: 9 },
-      { header: "Qo'shilgan", key: 'createdAt', width: 17 },
-      { header: 'QR', key: 'rawUrl', width: 40 },
+      { header: 'Kupon', key: 'couponsCount', width: 7 },
+      { header: 'Chiqarilgan', key: 'issuedAt', width: 17 },
+      { header: 'Mijoz (kassir yozgan)', key: 'customer', width: 24 },
+      { header: 'Skanerlagan telefon', key: 'redeemedPhone', width: 16 },
+      { header: 'Skanerlagan ism', key: 'redeemedName', width: 18 },
+      { header: 'Telegram ID', key: 'redeemedTgId', width: 14 },
+      { header: 'Skanerlangan', key: 'redeemedAt', width: 17 },
+      { header: 'Belgi', key: 'flag', width: 16 },
+      { header: 'Bekor sababi', key: 'cancelReason', width: 24 },
     ];
-    const rows = await this.prisma.receipt.findMany({
+    const STATUS = { ISSUED: 'Kutilmoqda', REDEEMED: 'Skanerlandi', CANCELLED: 'Bekor qilingan' } as const;
+    const rows = await this.prisma.voucher.findMany({
       orderBy: { id: 'asc' },
-      include: { participant: { select: { phone: true } }, branch: { select: { name: true } } },
+      include: { branch: { select: { name: true } }, terminal: { select: { name: true } }, issuedBy: { select: { login: true } } },
     });
-    for (const r of rows) {
+    for (const v of rows) {
       ws.addRow({
-        ...r,
-        phone: r.participant.phone,
-        branch: r.branch?.name ?? '',
-        fiscalAt: dt(r.fiscalAt),
-        amount: r.amount ? Number(r.amount) : null,
-        createdAt: dt(r.createdAt),
+        id: v.id,
+        status: v.status === 'ISSUED' && v.expiresAt <= new Date() ? "Muddati o'tgan" : STATUS[v.status],
+        branch: v.branch.name,
+        terminal: v.terminal?.name ?? '',
+        cashier: v.issuedBy.login,
+        amount: Number(v.amount),
+        couponsCount: v.couponsCount,
+        issuedAt: dt(v.issuedAt),
+        customer: [v.customerName, v.customerPhone].filter(Boolean).join(' · '),
+        redeemedPhone: v.redeemedPhone ?? '',
+        redeemedName: v.redeemedName ?? '',
+        redeemedTgId: v.redeemedTgId?.toString() ?? '',
+        redeemedAt: dt(v.redeemedAt),
+        flag: v.redeemedByStaff ? 'xodim' : v.phoneMismatch ? 'boshqa raqam' : '',
+        cancelReason: v.cancelReason ?? '',
       });
     }
   }

@@ -3,8 +3,8 @@
 import {
   RiCoupon3Line,
   RiDownload2Line,
-  RiFileList3Line,
   RiGroupLine,
+  RiQrCodeLine,
   RiTimeLine,
 } from '@remixicon/react';
 
@@ -16,20 +16,20 @@ const ITEMS = [
   {
     key: 'participants',
     title: 'Ishtirokchilar',
-    desc: "Telefon, ism, manba, ro'yxatdan o'tgan sana, cheklar va kuponlar soni",
+    desc: "Telefon, ism, manba, ro'yxatdan o'tgan sana, skanerlagan QR va kuponlar soni",
     icon: RiGroupLine,
   },
   {
     key: 'coupons',
     title: 'Kuponlar',
-    desc: "Kupon raqami, egasi, chek, filial, summa, o'yinda qatnashadimi",
+    desc: "Kupon raqami, egasi, filial, manba (kassa QR yoki taklif bonusi), o'yinda qatnashadimi",
     icon: RiCoupon3Line,
   },
   {
-    key: 'receipts',
-    title: 'Cheklar',
-    desc: 'Barcha cheklar: status, sabab, FM, chek raqami, summa, kuponlar',
-    icon: RiFileList3Line,
+    key: 'vouchers',
+    title: 'Vaucherlar (QR)',
+    desc: 'Barcha QR: kassir, terminal, summa, kim skanerladi, shubhali belgilar, bekor sababi',
+    icon: RiQrCodeLine,
   },
 ];
 

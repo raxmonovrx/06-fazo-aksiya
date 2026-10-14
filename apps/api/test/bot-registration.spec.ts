@@ -11,7 +11,6 @@ async function cleanup() {
   const ps = await prisma.participant.findMany({ where: { tgId: ids }, select: { id: true } });
   const pid = { in: ps.map((p) => p.id) };
   await prisma.coupon.deleteMany({ where: { participantId: pid } });
-  await prisma.scanLog.deleteMany({ where: { participantId: pid } });
   await prisma.receipt.deleteMany({ where: { participantId: pid } });
   await prisma.participant.updateMany({ where: { tgId: ids }, data: { referredById: null } });
   await prisma.participant.deleteMany({ where: { tgId: ids } });

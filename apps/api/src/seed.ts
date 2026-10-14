@@ -1,4 +1,4 @@
-// Boshlang'ich ma'lumot: aksiya, filiallar, ma'lum FM, birinchi admin.
+// Boshlang'ich ma'lumot: aksiya, filiallar, birinchi admin.
 // Qayta ishga tushirsa bo'ladi (idempotent) — mavjud yozuvlarni o'zgartirmaydi.
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
@@ -22,22 +22,16 @@ const BRANCHES = [
     name: 'Fazo Restaurant',
     brand: 'Fazo',
     minSum: 300_000,
-    iikoRef: { host: 'https://fazo-co.iiko.it', department: 'Fazo Family Restauraunt' },
-    devices: [{ fm: 'LG420230613349', legalName: '"Fazo DT" MChJ', stir: '312163993' }],
   },
   {
     name: 'Le Fazo',
     brand: 'Le Fazo',
     minSum: 200_000,
-    iikoRef: { host: 'https://fazo-co.iiko.it', department: 'Le Fazo' },
-    devices: [],
   },
   {
     name: 'Boy Bobo',
     brand: "To'raxon Boybobo choyxonasi",
     minSum: 200_000,
-    iikoRef: { host: 'https://to-raxon-boy-bobo-choyxonasi.iiko.it', department: "To'raxon Boybobo Choyxonasi" },
-    devices: [],
   },
 ];
 
@@ -55,19 +49,9 @@ async function main() {
   }
 
   for (const b of BRANCHES) {
-    let branch = await prisma.branch.findFirst({ where: { name: b.name } });
-    if (!branch) {
-      branch = await prisma.branch.create({
-        data: { name: b.name, brand: b.brand, minSum: b.minSum, couponPrice: b.minSum, iikoRef: b.iikoRef },
-      });
+    if (!(await prisma.branch.findFirst({ where: { name: b.name } }))) {
+      await prisma.branch.create({ data: { name: b.name, brand: b.brand, minSum: b.minSum, couponPrice: b.minSum } });
       console.log(`+ filial ${b.name}`);
-    }
-    for (const d of b.devices) {
-      const exists = await prisma.fiscalDevice.findUnique({ where: { fm: d.fm } });
-      if (!exists) {
-        await prisma.fiscalDevice.create({ data: { ...d, branchId: branch.id } });
-        console.log(`+ FM ${d.fm}`);
-      }
     }
   }
 

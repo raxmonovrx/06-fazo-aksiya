@@ -16,8 +16,6 @@ const schema = z.object({
   ADMIN_INIT_LOGIN: z.string().optional(),
   ADMIN_INIT_PASSWORD: z.string().optional(),
   SUPPORT_CONTACT: z.string().default(''),
-  // Rasm va eksport fayllari uchun papka
-  STORAGE_DIR: z.string().default('./storage'),
 });
 
 export type Config = z.infer<typeof schema>;

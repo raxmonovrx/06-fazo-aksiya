@@ -4,7 +4,6 @@ import { z } from 'zod';
 
 import { AdminGuard, CurrentAdmin, Perm } from '../admin/auth.js';
 import { parse } from '../admin/zod.js';
-import { parseDateTime } from '../reconcile/excel.js';
 import { VouchersService } from './vouchers.service.js';
 
 const issueSchema = z.object({
@@ -27,10 +26,11 @@ const listSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+/** ISO sana (panel "2026-10-15T00:00:00+05:00" yuboradi); noto'g'ri bo'lsa — filtr yo'q */
 const parseDate = (s?: string) => {
   if (!s) return undefined;
-  const d = /T.*(Z|[+-]\d{2}:?\d{2})$/.test(s) ? new Date(s) : parseDateTime(s.replace('T', ' '));
-  return d && !Number.isNaN(d.getTime()) ? d : undefined;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? undefined : d;
 };
 
 /** Kassa: vaucher chiqarish, ro'yxat, qayta chop etish, bekor qilish. */

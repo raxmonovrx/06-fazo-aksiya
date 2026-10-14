@@ -70,34 +70,42 @@ export class SettingsController {
   @Get('dashboard')
   @Perm('dashboard')
   async dashboard() {
-    const todayStart = tashkentDayStart(new Date());
-    const [participantsTotal, participantsToday, staff, byStatus, couponsEligible, couponsToday, branches, perBranch] =
+    const now = new Date();
+    const todayStart = tashkentDayStart(now);
+    const [participantsTotal, participantsToday, staff, couponsEligible, couponsToday, referralCoupons, issuedToday, redeemedToday, states, branches, perBranch] =
       await Promise.all([
         this.prisma.participant.count({ where: { rulesAcceptedAt: { not: null } } }),
         this.prisma.participant.count({ where: { rulesAcceptedAt: { gte: todayStart } } }),
         this.prisma.participant.count({ where: { isStaff: true } }),
-        this.prisma.receipt.groupBy({ by: ['status'], _count: { _all: true } }),
         this.prisma.coupon.count({ where: { eligible: true } }),
         this.prisma.coupon.count({ where: { eligible: true, createdAt: { gte: todayStart } } }),
+        this.prisma.coupon.count({ where: { eligible: true, receipt: { source: 'REFERRAL' } } }),
+        this.prisma.voucher.count({ where: { issuedAt: { gte: todayStart } } }),
+        this.prisma.voucher.count({ where: { redeemedAt: { gte: todayStart } } }),
+        this.prisma.$queryRaw<Array<{ state: string; n: number }>>`
+          SELECT CASE WHEN status = 'ISSUED' AND "expiresAt" <= ${now} THEN 'EXPIRED' ELSE status::text END AS state,
+                 count(*)::int AS n
+          FROM vouchers GROUP BY 1`,
         this.prisma.branch.findMany({ select: { id: true, name: true }, orderBy: { id: 'asc' } }),
-        this.prisma.$queryRaw<Array<{ branchId: number | null; receipts: number; approved: number; amount: string | null; coupons: number }>>`
-          SELECT r."branchId",
-                 count(*)::int AS receipts,
-                 count(*) FILTER (WHERE r.status = 'APPROVED')::int AS approved,
-                 sum(r.amount) FILTER (WHERE r.status IN ('APPROVED','BELOW_MIN'))::text AS amount,
-                 coalesce(sum(r."couponsCount") FILTER (WHERE r.status = 'APPROVED'), 0)::int AS coupons
-          FROM receipts r GROUP BY r."branchId"`,
+        this.prisma.$queryRaw<Array<{ branchId: number; issued: number; redeemed: number; amount: string | null; coupons: number }>>`
+          SELECT v."branchId",
+                 count(*) FILTER (WHERE v.status <> 'CANCELLED')::int AS issued,
+                 count(*) FILTER (WHERE v.status = 'REDEEMED')::int AS redeemed,
+                 sum(v.amount) FILTER (WHERE v.status = 'REDEEMED')::text AS amount,
+                 coalesce(sum(v."couponsCount") FILTER (WHERE v.status = 'REDEEMED'), 0)::int AS coupons
+          FROM vouchers v GROUP BY v."branchId"`,
       ]);
-    const receiptsToday = await this.prisma.receipt.count({ where: { createdAt: { gte: todayStart } } });
-    const unknownFms = await this.prisma.unknownFm.count();
     return {
       participants: { total: participantsTotal, today: participantsToday, staff },
-      receipts: { today: receiptsToday, byStatus: Object.fromEntries(byStatus.map((s) => [s.status, s._count._all])) },
-      coupons: { eligible: couponsEligible, today: couponsToday },
-      unknownFms,
-      branches: [...branches, { id: null, name: "Noma'lum" }].map((b) => {
+      coupons: { eligible: couponsEligible, today: couponsToday, referral: referralCoupons },
+      vouchers: {
+        issuedToday,
+        redeemedToday,
+        byState: Object.fromEntries(states.map((s) => [s.state, s.n])) as Partial<Record<'ISSUED' | 'REDEEMED' | 'CANCELLED' | 'EXPIRED', number>>,
+      },
+      branches: branches.map((b) => {
         const row = perBranch.find((x) => x.branchId === b.id);
-        return { ...b, receipts: row?.receipts ?? 0, approved: row?.approved ?? 0, amount: Number(row?.amount ?? 0), coupons: row?.coupons ?? 0 };
+        return { ...b, issued: row?.issued ?? 0, redeemed: row?.redeemed ?? 0, amount: Number(row?.amount ?? 0), coupons: row?.coupons ?? 0 };
       }),
     };
   }

@@ -13,12 +13,12 @@ import { normalizePhone } from '../core/phone.js';
 import { formatTashkent, tashkentDayStart } from '../core/time.js';
 import { newVoucherToken, voucherStartParam } from '../core/voucher-token.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { RateLimiter } from '../receipts/rate-limiter.js';
-import { fmtSum } from '../reconcile/reconcile.service.js';
+import { fmtSum } from '../core/format.js';
+import { RateLimiter } from '../core/rate-limiter.js';
 import { AlertsService } from '../telegram/alerts.service.js';
 import { ReferralService } from './referral.service.js';
 
-/** Vaucher amal qilish muddati (soat) */
+/** QR amal qilish muddati (soat) — aksiya sozlamasi (receiptWindowHours) bo'lmasa */
 export const VOUCHER_TTL_HOURS = 72;
 /** Bitta odam bir kunda bitta kassirdan shuncha vaucher olsa — shubhali */
 const SAME_PAIR_ALERT = 3;
@@ -94,7 +94,8 @@ export class VouchersService {
       if (!customerPhone) throw new BadRequestException("Telefon noto'g'ri (+998XXXXXXXXX)");
     }
 
-    const expiresAt = new Date(now.getTime() + VOUCHER_TTL_HOURS * 60 * 60 * 1000);
+    const ttlHours = campaign.receiptWindowHours || VOUCHER_TTL_HOURS;
+    const expiresAt = new Date(now.getTime() + ttlHours * 60 * 60 * 1000);
     const voucher = await this.prisma.$transaction(async (tx) => {
       const v = await tx.voucher.create({
         data: {
@@ -106,6 +107,8 @@ export class VouchersService {
           customerPhone,
           issuedById: actor.id,
           terminalId: terminal?.id ?? null,
+          // Muddat bilan bir xil soatdan (baza soati emas)
+          issuedAt: now,
           expiresAt,
         },
       });
@@ -246,8 +249,6 @@ export class VouchersService {
           couponsCount: v.couponsCount,
           reviewedById: v.issuedById,
           decidedAt: now,
-          // Natija mijozga darhol aytiladi — ertalabki xabarga kirmaydi
-          notifiedAt: now,
         },
       });
       await tx.coupon.createMany({

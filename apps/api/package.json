@@ -19,7 +19,6 @@
     "@nestjs/common": "^12",
     "@nestjs/core": "^12",
     "@nestjs/platform-express": "^12",
-    "@nestjs/schedule": "^12",
     "@prisma/client": "^6.19",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",

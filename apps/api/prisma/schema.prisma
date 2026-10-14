@@ -1,11 +1,10 @@
-// Fazo Club — "Omad Fazosi" aksiya tizimi
+// Fazo Group — “KIA SONET MENIKI” aksiya tizimi
 //
+// Kupon faqat kassir chiqargan bir martalik QR (Voucher) va taklif bonusi orqali beriladi.
 // Qoidalar:
-//  - Hamma vaqt UTC'da saqlanadi (timestamptz). Ko'rsatish va cron — Asia/Tashkent.
+//  - Hamma vaqt UTC'da saqlanadi (timestamptz). Ko'rsatish — Asia/Tashkent.
 //  - Pul — Decimal(14,2), so'mda.
 //  - Telefon — +998XXXXXXXXX.
-//  - Xom ma'lumot (kim, qaysi chek, qachon, qaysi kassa) birinchi kundan saqlanadi:
-//    kuponlarni keyin istalgan qoida bilan qayta hisoblash mumkin bo'lsin.
 
 generator client {
   provider = "prisma-client-js"
@@ -40,8 +39,6 @@ model Branch {
   minSum        Decimal   @default(100000) @db.Decimal(14, 2)
   couponPrice   Decimal   @default(100000) @db.Decimal(14, 2)
   maxPerReceipt Int       @default(10)
-  // iiko bog'lanishi: { host, department }
-  iikoRef       Json?
   // Chekdagi logo: admin yuklaydi, brauzerda oq-qora qilinadi (termoprinter faqat qora chiqaradi).
   // Asl rasm qayta sozlash uchun saqlanadi; ro'yxatlarda bu baytlar qaytarilmaydi
   logoEnabled   Boolean   @default(false)
@@ -56,12 +53,10 @@ model Branch {
   createdAt     DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
 
-  devices     FiscalDevice[]
-  receipts    Receipt[]
-  saleRecords SaleRecord[]
-  vouchers    Voucher[]
-  admins      AdminUser[]
-  terminals   Terminal[]
+  receipts  Receipt[]
+  vouchers  Voucher[]
+  admins    AdminUser[]
+  terminals Terminal[]
 
   @@map("branches")
 }
@@ -85,20 +80,6 @@ model Terminal {
   @@map("terminals")
 }
 
-model FiscalDevice {
-  id        Int      @id @default(autoincrement())
-  fm        String   @unique
-  branchId  Int
-  legalName String?
-  stir      String?
-  note      String?
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-
-  branch Branch @relation(fields: [branchId], references: [id])
-
-  @@map("fiscal_devices")
-}
-
 model Participant {
   id              Int       @id @default(autoincrement())
   tgId            BigInt    @unique
@@ -117,8 +98,6 @@ model Participant {
   source          String?
   isStaff         Boolean   @default(false)
   isBlocked       Boolean   @default(false)
-  // Foydalanuvchi botni bloklagan (xabar yetib bormadi)
-  botBlockedAt    DateTime? @db.Timestamptz(3)
   // Rozilik: raqam yuborilganda (qoidalar o'sha xabarda ko'rsatiladi). Qaysi qoidalar
   // matniga rozi bo'lgani — rulesText'ning sha256 boshi (keyin matn o'zgarsa ham isbot)
   rulesAcceptedAt DateTime? @db.Timestamptz(3)
@@ -129,13 +108,11 @@ model Participant {
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 
-  referredBy    Participant?   @relation("Referral", fields: [referredById], references: [id])
-  referrals     Participant[]  @relation("Referral")
-  receipts      Receipt[]      @relation("ReceiptOwner")
-  coupons       Coupon[]
-  notifications Notification[]
-  scanLogs      ScanLog[]
-  vouchers      Voucher[]
+  referredBy Participant?  @relation("Referral", fields: [referredById], references: [id])
+  referrals  Participant[] @relation("Referral")
+  receipts   Receipt[]     @relation("ReceiptOwner")
+  coupons    Coupon[]
+  vouchers   Voucher[]
 
   @@map("participants")
 }
@@ -159,39 +136,31 @@ enum ReceiptStatus {
   NEEDS_REVIEW
 }
 
+/**
+ * Kupon berilgan yozuv: kassa QR'i skanerlanganda (VOUCHER, receiptNumber "V<vaucher>")
+ * yoki taklif bonusi (REFERRAL, "R<do'st>"). Eski fiskal chek maydonlari olib tashlangan.
+ */
 model Receipt {
   id            Int           @id @default(autoincrement())
   participantId Int
-  // Rasm dekodlanmasa fm/receiptNumber bo'sh bo'ladi (NEEDS_REVIEW)
-  fm            String?
   receiptNumber String?
-  fiscalSign    String?
   fiscalAt      DateTime?     @db.Timestamptz(3)
-  rawUrl        String?
   source        ReceiptSource
   status        ReceiptStatus @default(PENDING)
   amount        Decimal?      @db.Decimal(14, 2)
   branchId      Int?
   couponsCount  Int           @default(0)
-  // Mashina o'qiydigan kod (UNKNOWN_FM, EXPIRED, ...) + odam o'qiydigan matn
-  rejectCode    String?
-  rejectReason  String?
-  saleRecordId  Int?
-  photoFileId   String?
+  // Vaucherni chiqargan kassir
   reviewedById  Int?
-  // Mijozga natija haqida xabar yuborilganmi
-  notifiedAt    DateTime?     @db.Timestamptz(3)
   createdAt     DateTime      @default(now()) @db.Timestamptz(3)
   decidedAt     DateTime?     @db.Timestamptz(3)
 
   participant Participant @relation("ReceiptOwner", fields: [participantId], references: [id])
   branch      Branch?     @relation(fields: [branchId], references: [id])
-  saleRecord  SaleRecord? @relation(fields: [saleRecordId], references: [id])
   reviewedBy  AdminUser?  @relation(fields: [reviewedById], references: [id])
   coupons     Coupon[]
   voucher     Voucher?
 
-  @@unique([fm, receiptNumber])
   @@index([status])
   @@index([participantId])
   @@index([createdAt])
@@ -215,54 +184,6 @@ model Coupon {
   @@index([participantId])
   @@index([receiptId])
   @@map("coupons")
-}
-
-enum SaleSource {
-  IIKO_API
-  EXCEL
-}
-
-model SaleRecord {
-  id            Int        @id @default(autoincrement())
-  source        SaleSource
-  // Manba ichidagi noyob kalit — qayta import takror yozuv yaratmasin
-  externalKey   String     @unique
-  fm            String?
-  receiptNumber String?
-  branchId      Int?
-  branchHint    String?
-  closedAt      DateTime   @db.Timestamptz(3)
-  amount        Decimal    @db.Decimal(14, 2)
-  isRefund      Boolean    @default(false)
-  importBatchId Int?
-  raw           Json
-  createdAt     DateTime   @default(now()) @db.Timestamptz(3)
-
-  branch      Branch?      @relation(fields: [branchId], references: [id])
-  importBatch ImportBatch? @relation(fields: [importBatchId], references: [id])
-  receipts    Receipt[]
-
-  @@index([fm, receiptNumber])
-  @@index([branchId, closedAt])
-  @@map("sale_records")
-}
-
-model ImportBatch {
-  id          Int        @id @default(autoincrement())
-  source      SaleSource
-  fileName    String?
-  periodFrom  DateTime?  @db.Timestamptz(3)
-  periodTo    DateTime?  @db.Timestamptz(3)
-  rows        Int        @default(0)
-  matched     Int        @default(0)
-  createdById Int?
-  log         Json?
-  createdAt   DateTime   @default(now()) @db.Timestamptz(3)
-
-  createdBy   AdminUser?   @relation(fields: [createdById], references: [id])
-  saleRecords SaleRecord[]
-
-  @@map("import_batches")
 }
 
 model StaffPhone {
@@ -304,12 +225,11 @@ model AdminUser {
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now()) @db.Timestamptz(3)
 
-  branch            Branch?       @relation(fields: [branchId], references: [id])
+  branch            Branch?    @relation(fields: [branchId], references: [id])
   reviewedReceipts  Receipt[]
-  importBatches     ImportBatch[]
   auditLogs         AuditLog[]
-  issuedVouchers    Voucher[]     @relation("VoucherIssuer")
-  cancelledVouchers Voucher[]     @relation("VoucherCanceller")
+  issuedVouchers    Voucher[]  @relation("VoucherIssuer")
+  cancelledVouchers Voucher[]  @relation("VoucherCanceller")
 
   @@map("admin_users")
 }
@@ -330,51 +250,7 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-model Notification {
-  id            Int       @id @default(autoincrement())
-  participantId Int
-  type          String
-  payload       Json
-  sendAfter     DateTime  @default(now()) @db.Timestamptz(3)
-  sentAt        DateTime? @db.Timestamptz(3)
-  error         String?
-  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
-
-  participant Participant @relation(fields: [participantId], references: [id])
-
-  @@index([sentAt, sendAfter])
-  @@map("notifications")
-}
-
-// Har bir skanerlash urinishi (muvaffaqiyatsizlari ham) — firibgarlik va
-// xatolarni tahlil qilish uchun xom jurnal
-model ScanLog {
-  id            Int      @id @default(autoincrement())
-  participantId Int?
-  tgId          BigInt?
-  channel       String
-  rawText       String?
-  result        String
-  receiptId     Int?
-  createdAt     DateTime @default(now()) @db.Timestamptz(3)
-
-  participant Participant? @relation(fields: [participantId], references: [id])
-
-  @@index([createdAt])
-  @@map("scan_logs")
-}
-
-// Noma'lum FM'lar — admin ko'rishi va filialga bog'lashi uchun
-model UnknownFm {
-  fm        String   @id
-  firstSeen DateTime @default(now()) @db.Timestamptz(3)
-  lastSeen  DateTime @default(now()) @db.Timestamptz(3)
-  hits      Int      @default(1)
-
-  @@map("unknown_fms")
-}
-
-// Kalit-qiymat sozlamalar (Excel ustun mapping va h.k.)
+// Kalit-qiymat sozlamalar (taklif bonusi va h.k.)
 model Setting {
   key       String   @id
   value     Json

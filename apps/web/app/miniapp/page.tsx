@@ -18,7 +18,6 @@ interface ReceiptRow {
   fiscalAt: string | null;
   amount: string | null;
   couponsCount: number;
-  rejectReason: string | null;
   source: string;
   createdAt: string;
   branch: { name: string } | null;
@@ -54,7 +53,6 @@ interface Sheet {
 
 const BOT = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'FazoClub_bot';
 const BRAND = '#C8102E';
-const PENDING = new Set(['PENDING', 'NEEDS_REVIEW', 'NOT_FOUND']);
 const NO_SCANNER = new Set(['tdesktop', 'macos', 'web', 'weba', 'webk', 'unknown']);
 const MOBILE = new Set(['ios', 'android', 'android_x']);
 const ANDROID = new Set(['android', 'android_x']);
@@ -258,12 +256,9 @@ export default function MiniApp() {
     );
   }
 
-  const pending = me.receipts.filter((r) => PENDING.has(r.status)).length;
   const caption = me.isStaff
     ? "Xodimlar o'yinda qatnashmaydi"
-    : pending > 0
-      ? `${pending} ta chek tekshirilmoqda`
-      : "Kassir bergan QR'ni skanerlang — kupon darhol qo'shiladi";
+    : "Kassir bergan QR'ni skanerlang — kupon darhol qo'shiladi";
 
   return root(
     <>
@@ -277,11 +272,11 @@ export default function MiniApp() {
         <button className="btn-chip" onClick={() => setSheet('rules')}>Qoidalar</button>
       </header>
 
-      <h2 className="list-title">Cheklarim</h2>
+      <h2 className="list-title">Kuponlarim</h2>
       <div className="list">
         {me.receipts.length === 0 ? (
           <div className="empty">
-            <p className="t-body">Hali chek yo&apos;q</p>
+            <p className="t-body">Hali kupon yo&apos;q</p>
             <p className="t-foot c-sub">To'lovdan keyin kassirdan Fazo Group QR'ini so'rang</p>
           </div>
         ) : (
@@ -309,23 +304,16 @@ export default function MiniApp() {
 // ── Ro'yxat qatori ─────────────────────────────────────────────────────────
 
 function Row({ r }: { r: ReceiptRow }) {
-  const name =
-    r.source === 'REFERRAL' ? "Do'st taklifi" : (r.branch?.name ?? (r.source === 'PHOTO' ? 'Chek rasmi' : 'Chek'));
-  const meta = [fmtShort(r.fiscalAt ?? r.createdAt), r.amount && !PENDING.has(r.status) ? `${sum(r.amount)} so'm` : null]
-    .filter(Boolean)
-    .join(' · ');
-  let right: React.ReactNode;
-  if (r.status === 'APPROVED') right = <span className="c-brand t-body-sb">+{r.couponsCount}</span>;
-  else if (PENDING.has(r.status)) right = <span className="c-warn t-foot">Tekshiruvda</span>;
-  else if (r.status === 'BELOW_MIN') right = <span className="c-sub t-foot">Summa kam</span>;
-  else right = <span className="c-err t-foot">Rad etildi</span>;
+  // Kassa QR'i (filial nomi) yoki taklif bonusi — ikkalasi ham darhol tasdiqlanadi
+  const name = r.source === 'REFERRAL' ? "Do'st taklifi" : (r.branch?.name ?? 'Kassa QR');
+  const meta = [fmtShort(r.createdAt), r.amount ? `${sum(r.amount)} so'm` : null].filter(Boolean).join(' · ');
+  const right = <span className="c-brand t-body-sb">+{r.couponsCount}</span>;
   return (
     <div className="row">
       <div className="row-main">
         <p className="t-body ellipsis">{name}</p>
         <p className="t-foot c-sub ellipsis">
           {meta}
-          {r.status === 'REJECTED' && r.rejectReason && ` · ${r.rejectReason}`}
         </p>
       </div>
       {right}

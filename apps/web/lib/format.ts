@@ -35,42 +35,6 @@ export function fmtSum(v: number | string | null | undefined) {
   return `${Math.round(Number(v)).toLocaleString('ru-RU').replace(/ /g, ' ')} so'm`;
 }
 
-export const STATUS: Record<
-  string,
-  { label: string; cls: string; emoji: string }
-> = {
-  PENDING: {
-    label: 'Tekshirilmoqda',
-    cls: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
-    emoji: '⏳',
-  },
-  APPROVED: {
-    label: 'Tasdiqlandi',
-    cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300',
-    emoji: '✅',
-  },
-  BELOW_MIN: {
-    label: 'Summa kam',
-    cls: 'bg-secondary text-secondary-foreground',
-    emoji: '➖',
-  },
-  REJECTED: {
-    label: 'Rad etildi',
-    cls: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300',
-    emoji: '❌',
-  },
-  NOT_FOUND: {
-    label: 'Topilmadi',
-    cls: 'bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300',
-    emoji: '🔎',
-  },
-  NEEDS_REVIEW: {
-    label: 'Moderatsiyada',
-    cls: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300',
-    emoji: '👀',
-  },
-};
-
 /** 998901234567 → "+998 90 123 4567"; boshqa format bo'lsa o'zgarmaydi */
 export function fmtPhone(p: string | null | undefined) {
   if (!p) return '—';

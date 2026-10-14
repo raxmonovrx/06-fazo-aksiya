@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 import { isHttps } from '../config.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { RateLimiter } from '../receipts/rate-limiter.js';
+import { RateLimiter } from '../core/rate-limiter.js';
 import { ADMIN_COOKIE, AdminGuard, AnyStaff, CurrentAdmin, SESSION_HOURS, signAdminToken } from './auth.js';
 import { AuditService } from './audit.service.js';
 import { permissionsOf } from './permissions.js';

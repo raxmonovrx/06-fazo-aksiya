@@ -244,7 +244,7 @@ export default function SettingsPage() {
                   </div>
 
                   <Field data-invalid={!!windowErr || undefined}>
-                    <FieldLabel htmlFor="c-window">Chek oynasi</FieldLabel>
+                    <FieldLabel htmlFor="c-window">QR amal qilish muddati</FieldLabel>
                     <InputGroup className="w-full max-w-40">
                       <InputGroupInput
                         id="c-window"
@@ -270,7 +270,7 @@ export default function SettingsPage() {
                       <FieldError>{windowErr}</FieldError>
                     ) : (
                       <FieldDescription>
-                        Chek xariddan keyin shu vaqt ichida yuborilishi kerak
+                        Kassir chiqargan QR shu vaqt ichida skanerlanishi kerak (yangi QR'larga ta'sir qiladi)
                         {hours >= 24 && hours % 24 === 0 && (
                           <> ({hours / 24} kun)</>
                         )}

@@ -3,7 +3,6 @@
 import {
   RiAddLine,
   RiAlertLine,
-  RiCalculatorLine,
   RiComputerLine,
   RiDeleteBinLine,
   RiEdit2Line,
@@ -17,11 +16,7 @@ import { toast } from 'sonner';
 import { BranchReceipt } from '@/components/admin/branch-receipt';
 import { DataTableCard } from '@/components/admin/data-table';
 import { ErrorAlert, TableLoading, useLoad } from '@/components/admin/kit';
-import {
-  EmptyState,
-  PageContainer,
-  PageIntro,
-} from '@/components/admin/layout';
+import { EmptyState, PageContainer, PageIntro } from '@/components/admin/layout';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -90,17 +85,10 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { adminApi } from '@/lib/api';
-import { fmtShort, fmtSum } from '@/lib/format';
+import { fmtSum } from '@/lib/format';
 import { OUTPUTS, type Terminal, type TerminalOutput } from '@/lib/terminals';
 import { cn } from '@/lib/utils';
 
-interface Device {
-  id: number;
-  fm: string;
-  legalName: string | null;
-  stir: string | null;
-  note: string | null;
-}
 interface Branch {
   id: number;
   name: string;
@@ -109,37 +97,25 @@ interface Branch {
   minSum: string;
   couponPrice: string;
   maxPerReceipt: number;
-  iikoRef: { host?: string; department?: string } | null;
-  devices: Device[];
   terminals: Terminal[];
-}
-interface UnknownFm {
-  fm: string;
-  firstSeen: string;
-  lastSeen: string;
-  hits: number;
 }
 
 type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
-type EditorTab = 'general' | 'rule' | 'receipt' | 'iiko' | 'devices' | 'terminals';
+type EditorTab = 'general' | 'rule' | 'receipt' | 'terminals';
 
 /** 100000 → "100 000" (so'msiz) */
 const fmtNum = (v: number | string) =>
   Math.round(Number(v)).toLocaleString('ru-RU').replace(/\s/g, ' ');
-const hostLabel = (h?: string) => h?.replace(/^https?:\/\//, '') ?? '';
 
 export default function BranchesPage() {
   const branches = useLoad(() => adminApi<Branch[]>('/branches'), []);
-  const unknown = useLoad(() => adminApi<UnknownFm[]>('/unknown-fms'), []);
   const [adding, setAdding] = useState(false);
   const [editor, setEditor] = useState<{ id: number; tab: EditorTab } | null>(
     null,
   );
   const [toggling, setToggling] = useState<number | null>(null);
 
-  const reloadAll = async () => {
-    await Promise.all([branches.reload(), unknown.reload()]);
-  };
+  const reloadAll = () => branches.reload();
   // Amal: muvaffaqiyat — toast, xato — toast.error; true/false qaytaradi
   const run: Run = async (fn, ok) => {
     try {
@@ -170,7 +146,6 @@ export default function BranchesPage() {
   };
 
   const list = branches.data ?? [];
-  const branchItems = list.map((b) => ({ value: String(b.id), label: b.name }));
   const editing = editor ? list.find((b) => b.id === editor.id) : undefined;
   const open = (id: number, tab: EditorTab = 'general') =>
     setEditor({ id, tab });
@@ -178,7 +153,7 @@ export default function BranchesPage() {
   return (
     <PageContainer size="wide">
       <PageIntro
-        description="Filiallar, kupon qoidalari, kassa terminallari (QR shu yerdan chiqadi) va fiskal modullar (FM)."
+        description="Filiallar, kupon qoidalari, chek ko'rinishi va kassa terminallari."
         actions={
           <Button size="sm" onClick={() => setAdding(true)}>
             <RiAddLine data-icon="inline-start" />
@@ -187,11 +162,7 @@ export default function BranchesPage() {
         }
       />
 
-      <ErrorAlert error={branches.error ?? unknown.error} />
-
-      {!!unknown.data?.length && (
-        <UnknownFms items={unknown.data} branchItems={branchItems} run={run} />
-      )}
+      <ErrorAlert error={branches.error} />
 
       <DataTableCard>
         <Table>
@@ -201,17 +172,16 @@ export default function BranchesPage() {
               <TableHead className="w-36">Holat</TableHead>
               <TableHead>Kupon qoidasi</TableHead>
               <TableHead className="w-32">Terminallar</TableHead>
-              <TableHead>iiko</TableHead>
               <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {branches.loading && !branches.data && (
-              <TableLoading colSpan={6} rows={3} />
+              <TableLoading colSpan={5} rows={3} />
             )}
             {branches.data && !list.length && (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6}>
+                <TableCell colSpan={5}>
                   <EmptyState
                     icon={RiStore2Line}
                     title="Hali filial yo'q"
@@ -292,25 +262,6 @@ export default function BranchesPage() {
                       yo&apos;q
                     </Badge>
                   )}
-                  <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                    {b.devices.length} ta FM
-                  </div>
-                </TableCell>
-                <TableCell className="max-w-64">
-                  {b.iikoRef?.department || b.iikoRef?.host ? (
-                    <>
-                      <div className="truncate">
-                        {b.iikoRef.department ?? '—'}
-                      </div>
-                      {b.iikoRef.host && (
-                        <div className="truncate text-xs text-muted-foreground">
-                          {hostLabel(b.iikoRef.host)}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground">Ulanmagan</span>
-                  )}
                 </TableCell>
                 <TableCell className="text-right">
                   <div
@@ -337,10 +288,6 @@ export default function BranchesPage() {
                         <DropdownMenuItem onClick={() => open(b.id, 'terminals')}>
                           <RiComputerLine />
                           Terminallar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => open(b.id, 'devices')}>
-                          <RiCalculatorLine />
-                          Fiskal modullar
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -388,79 +335,6 @@ export default function BranchesPage() {
   );
 }
 
-function UnknownFms({
-  items,
-  branchItems,
-  run,
-}: {
-  items: UnknownFm[];
-  branchItems: { value: string; label: string }[];
-  run: Run;
-}) {
-  return (
-    <section className="overflow-hidden rounded-xl border border-amber-500/40 bg-card">
-      <div className="flex items-start gap-3 border-b bg-amber-500/5 px-4 py-3">
-        <RiAlertLine className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-        <div className="grid gap-0.5">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            Noma&apos;lum FM&apos;lar
-            <Badge variant="outline" className="tabular-nums">
-              {items.length}
-            </Badge>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Bu kassalardan cheklar kelmoqda, lekin ular filialga
-            bog&apos;lanmagan. Biriktirilgach, kutayotgan cheklar qayta
-            ishlanadi.
-          </p>
-        </div>
-      </div>
-      <ul className="divide-y">
-        {items.map((u) => (
-          <li
-            key={u.fm}
-            className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2.5"
-          >
-            <div className="grid gap-0.5">
-              <span className="font-mono text-sm">{u.fm}</span>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {u.hits} ta chek · oxirgi {fmtShort(u.lastSeen)}
-              </span>
-            </div>
-            <Select
-              items={branchItems}
-              value={null}
-              onValueChange={(v) => {
-                const id = v as string | null;
-                if (!id) return;
-                void run(
-                  () =>
-                    adminApi(`/branches/${id}/devices`, {
-                      method: 'POST',
-                      json: { fm: u.fm },
-                    }),
-                  `${u.fm} bog'landi`,
-                );
-              }}
-            >
-              <SelectTrigger size="sm" className="w-full sm:w-56">
-                <SelectValue placeholder="Filialga biriktirish" />
-              </SelectTrigger>
-              <SelectContent>
-                {branchItems.map((i) => (
-                  <SelectItem key={i.value} value={i.value}>
-                    {i.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 function MoneyInput({
   id,
   value,
@@ -505,8 +379,6 @@ function BranchEditor({
     couponPrice: String(Math.round(Number(b.couponPrice))),
     maxPerReceipt: String(b.maxPerReceipt),
     isActive: b.isActive,
-    department: b.iikoRef?.department ?? '',
-    host: b.iikoRef?.host ?? '',
   };
   const [f, setF] = useState(initial);
   const [saved, setSaved] = useState(initial);
@@ -540,13 +412,6 @@ function BranchEditor({
             couponPrice: num(f.couponPrice),
             maxPerReceipt: num(f.maxPerReceipt),
             isActive: f.isActive,
-            iikoRef:
-              f.department || f.host
-                ? {
-                    department: f.department || undefined,
-                    host: f.host || undefined,
-                  }
-                : null,
           },
         }),
       `${f.name} saqlandi`,
@@ -561,7 +426,7 @@ function BranchEditor({
         <SheetTitle>{b.name}</SheetTitle>
         <SheetDescription>
           {b.brand ? `${b.brand} · ` : ''}
-          {b.terminals.filter((t) => t.isActive).length} ta terminal · {b.devices.length} ta FM
+          {b.terminals.filter((t) => t.isActive).length} ta terminal
         </SheetDescription>
       </SheetHeader>
 
@@ -575,17 +440,10 @@ function BranchEditor({
             <TabsTrigger value="general">Umumiy</TabsTrigger>
             <TabsTrigger value="rule">Kupon</TabsTrigger>
             <TabsTrigger value="receipt">Chek</TabsTrigger>
-            <TabsTrigger value="iiko">iiko</TabsTrigger>
             <TabsTrigger value="terminals">
               Terminallar
               <span className="text-xs text-muted-foreground tabular-nums">
                 {b.terminals.filter((t) => t.isActive).length}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="devices">
-              FM
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {b.devices.length}
               </span>
             </TabsTrigger>
           </TabsList>
@@ -680,34 +538,6 @@ function BranchEditor({
             </FieldGroup>
           </TabsContent>
 
-          <TabsContent value="iiko">
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor={id('dep')}>Department</FieldLabel>
-                <Input
-                  id={id('dep')}
-                  value={f.department}
-                  placeholder="iiko'dagi bo'lim nomi"
-                  onChange={(e) => set('department')(e.target.value)}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor={id('host')}>Server</FieldLabel>
-                <Input
-                  id={id('host')}
-                  value={f.host}
-                  placeholder="https://….iiko.it"
-                  className="font-mono"
-                  onChange={(e) => set('host')(e.target.value)}
-                />
-                <FieldDescription>
-                  Ikkalasi ham bo&apos;sh bo&apos;lsa, iiko solishtiruvi
-                  o&apos;chadi.
-                </FieldDescription>
-              </Field>
-            </FieldGroup>
-          </TabsContent>
-
           <TabsContent value="receipt">
             <BranchReceipt branchId={b.id} branchName={b.name} />
           </TabsContent>
@@ -716,19 +546,12 @@ function BranchEditor({
             <TerminalsList terminals={b.terminals} run={run} />
             <AddTerminalForm branchId={b.id} run={run} />
           </TabsContent>
-
-          <TabsContent value="devices" className="flex flex-col gap-4">
-            <DevicesList devices={b.devices} run={run} />
-            <AddDeviceForm branchId={b.id} run={run} />
-          </TabsContent>
         </div>
       </Tabs>
 
       <SheetFooter className="flex-row items-center justify-end border-t">
-        {(tab === 'devices' || tab === 'terminals') && (
-          <span className="mr-auto hidden text-xs text-muted-foreground sm:inline">
-            {tab === 'devices' ? 'FM' : 'Terminallar'} darhol saqlanadi
-          </span>
+        {tab === 'terminals' && (
+          <span className="mr-auto hidden text-xs text-muted-foreground sm:inline">Terminallar darhol saqlanadi</span>
         )}
         {/* Chek yorlig'i o'z tugmasi bilan saqlanadi — bu yerda faqat yopish */}
         {tab === 'receipt' ? (
@@ -748,196 +571,6 @@ function BranchEditor({
         )}
       </SheetFooter>
     </>
-  );
-}
-
-function DevicesList({ devices, run }: { devices: Device[]; run: Run }) {
-  if (!devices.length)
-    return (
-      <div className="rounded-lg border border-dashed">
-        <EmptyState
-          className="py-8"
-          icon={RiCalculatorLine}
-          title="FM qo'shilmagan"
-          description="Quyida FM raqamini kiriting — shu kassa cheklari filialga bog'lanadi."
-        />
-      </div>
-    );
-
-  return (
-    <DataTableCard className="rounded-lg">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead>FM</TableHead>
-            <TableHead>Yuridik shaxs</TableHead>
-            <TableHead className="w-10" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {devices.map((d) => (
-            <TableRow key={d.id}>
-              <TableCell>
-                <div className="font-mono text-xs">{d.fm}</div>
-                {d.note && (
-                  <div className="text-xs text-muted-foreground">{d.note}</div>
-                )}
-              </TableCell>
-              <TableCell>
-                <div>{d.legalName ?? '—'}</div>
-                {d.stir && (
-                  <div className="text-xs text-muted-foreground tabular-nums">
-                    STIR {d.stir}
-                  </div>
-                )}
-              </TableCell>
-              <TableCell className="text-right">
-                <AlertDialog>
-                  <AlertDialogTrigger
-                    render={
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="O'chirish"
-                        className="text-muted-foreground hover:text-destructive"
-                      />
-                    }
-                  >
-                    <RiDeleteBinLine />
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        {d.fm} o&apos;chirilsinmi?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Bu kassadan keladigan cheklar yana noma&apos;lum FM
-                        bo&apos;lib qoladi.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
-                      <AlertDialogAction
-                        render={<Button variant="destructive" />}
-                        onClick={() =>
-                          void run(
-                            () =>
-                              adminApi(`/devices/${d.id}`, {
-                                method: 'DELETE',
-                              }),
-                            "FM o'chirildi",
-                          )
-                        }
-                      >
-                        O&apos;chirish
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </DataTableCard>
-  );
-}
-
-function AddDeviceForm({ branchId, run }: { branchId: number; run: Run }) {
-  const [dev, setDev] = useState({ fm: '', legalName: '', stir: '', note: '' });
-  const [busy, setBusy] = useState(false);
-  const id = (k: string) => `dev${branchId}-${k}`;
-
-  return (
-    <form
-      className="grid gap-3 rounded-lg border bg-muted/30 p-3"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setBusy(true);
-        await run(async () => {
-          const res = await adminApi<{ released: number }>(
-            `/branches/${branchId}/devices`,
-            {
-              method: 'POST',
-              json: {
-                ...dev,
-                legalName: dev.legalName || null,
-                stir: dev.stir || null,
-                note: dev.note || null,
-              },
-            },
-          );
-          // Yuridik shaxs va STIR keyingi kassa uchun qoladi
-          setDev({
-            fm: '',
-            legalName: dev.legalName,
-            stir: dev.stir,
-            note: '',
-          });
-          return res;
-        }, "FM qo'shildi");
-        setBusy(false);
-      }}
-    >
-      <div className="text-sm font-medium">FM qo&apos;shish</div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field>
-          <FieldLabel htmlFor={id('fm')}>FM raqami</FieldLabel>
-          <Input
-            id={id('fm')}
-            placeholder="LG42…"
-            className="font-mono"
-            value={dev.fm}
-            onChange={(e) => setDev({ ...dev, fm: e.target.value })}
-            required
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor={id('note')}>Izoh</FieldLabel>
-          <Input
-            id={id('note')}
-            placeholder="Masalan: 1-kassa"
-            value={dev.note}
-            onChange={(e) => setDev({ ...dev, note: e.target.value })}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor={id('legal')}>Yuridik shaxs</FieldLabel>
-          <Input
-            id={id('legal')}
-            placeholder="«…» MChJ"
-            value={dev.legalName}
-            onChange={(e) => setDev({ ...dev, legalName: e.target.value })}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor={id('stir')}>STIR</FieldLabel>
-          <Input
-            id={id('stir')}
-            placeholder="9 raqam"
-            inputMode="numeric"
-            className="tabular-nums"
-            value={dev.stir}
-            onChange={(e) => setDev({ ...dev, stir: e.target.value })}
-          />
-        </Field>
-      </div>
-      <div className="flex justify-end">
-        <Button
-          type="submit"
-          variant="secondary"
-          size="sm"
-          disabled={busy || dev.fm.trim().length < 6}
-        >
-          {busy ? (
-            <RiLoader4Line data-icon="inline-start" className="animate-spin" />
-          ) : (
-            <RiAddLine data-icon="inline-start" />
-          )}
-          Qo&apos;shish
-        </Button>
-      </div>
-    </form>
   );
 }
 

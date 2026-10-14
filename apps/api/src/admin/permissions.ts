@@ -9,12 +9,9 @@ export const PERMISSIONS = [
   'cashier',
   'vouchers',
   'vouchers.cancel',
-  'moderation',
-  'receipts',
   'participants',
   'participants.edit',
   'branches',
-  'import',
   'staff',
   'export',
   'settings',
@@ -25,7 +22,7 @@ export type Permission = (typeof PERMISSIONS)[number];
 /** Rol tanlanganda beriladigan boshlang'ich ruxsatlar (keyin har biri alohida o'zgartiriladi) */
 export const ROLE_TEMPLATES: Record<AdminRole, readonly Permission[]> = {
   ADMIN: PERMISSIONS,
-  OPERATOR: ['dashboard', 'vouchers', 'moderation', 'receipts', 'participants'],
+  OPERATOR: ['dashboard', 'vouchers', 'participants'],
   MANAGER: ['cashier', 'vouchers', 'vouchers.cancel'],
   CASHIER: ['cashier'],
 };

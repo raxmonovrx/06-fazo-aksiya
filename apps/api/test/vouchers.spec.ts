@@ -128,7 +128,7 @@ describe('Vaucherlar (kassir QR)', () => {
   });
 
   it('kassir boshqa admin bo\'limlariga kira olmaydi', async () => {
-    expect((await api('tv_kassa1', '/receipts')).status).toBe(403);
+    expect((await api('tv_kassa1', '/export/coupons.xlsx')).status).toBe(403);
     expect((await api('tv_kassa1', '/dashboard')).status).toBe(403);
     expect((await api('tv_kassa1', '/participants')).status).toBe(403);
     const me = await (await api('tv_kassa1', '/auth/me')).json();
@@ -350,7 +350,7 @@ describe('Vaucherlar (kassir QR)', () => {
     expect((await api('tv_manager', `/vouchers/${own.id}/cancel`, { method: 'POST', json: { reason: 'test' } })).status).toBe(200);
     // Kassir boshqa kassirnikini bekor qila olmaydi
     expect((await api('tv_kassa2', `/vouchers/${own.id}/reprint`, { method: 'POST' })).status).toBe(403);
-    expect((await api('tv_manager', '/receipts')).status).toBe(403);
+    expect((await api('tv_manager', '/participants')).status).toBe(403);
   });
 
   describe('foydalanuvchilar (RBAC)', () => {

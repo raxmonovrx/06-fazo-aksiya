@@ -1,7 +1,6 @@
 import { esc } from '../bot/texts.js';
-import { fmtSum } from '../reconcile/reconcile.service.js';
+import { fmtSum } from '../core/format.js';
 import type { RedeemResult } from './vouchers.service.js';
-import { VOUCHER_TTL_HOURS } from './vouchers.service.js';
 
 /** Bot uchun vaucher natijasi matni (HTML). */
 export function redeemMessage(r: RedeemResult): string {
@@ -17,7 +16,7 @@ export function redeemMessage(r: RedeemResult): string {
     case 'USED':
       return `❌ Bu QR allaqachon ishlatilgan.`;
     case 'EXPIRED':
-      return `⌛️ Bu QR'ning muddati o'tgan (${VOUCHER_TTL_HOURS} soat).`;
+      return `⌛️ Bu QR'ning muddati o'tgan. Kassirga murojaat qiling.`;
     case 'CANCELLED':
       return `❌ Bu QR bekor qilingan.`;
     case 'NO_CAMPAIGN':

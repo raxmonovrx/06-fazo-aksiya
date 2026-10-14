@@ -36,8 +36,6 @@ services:
         condition: service_healthy
     ports:
       - '127.0.0.1:${API_PORT:-4600}:4600'
-    volumes:
-      - storage:/app/storage
     healthcheck:
       test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:4600/api/health || exit 1']
       interval: 15s
@@ -61,4 +59,3 @@ services:
 
 volumes:
   pgdata:
-  storage:
