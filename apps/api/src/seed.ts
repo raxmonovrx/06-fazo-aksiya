@@ -57,7 +57,7 @@ async function main() {
     let branch = await prisma.branch.findFirst({ where: { name: b.name } });
     if (!branch) {
       branch = await prisma.branch.create({
-        data: { name: b.name, brand: b.brand, minSum: b.minSum, iikoRef: b.iikoRef },
+        data: { name: b.name, brand: b.brand, minSum: b.minSum, couponPrice: b.minSum, iikoRef: b.iikoRef },
       });
       console.log(`+ filial ${b.name}`);
     }
