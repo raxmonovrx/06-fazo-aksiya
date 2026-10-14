@@ -1,4 +1,4 @@
-# Fazo Club — "Omad Fazosi" aksiya tizimi
+# Fazo Group — “KIA SONET MENIKI” aksiya tizimi
 
 Mijoz Telegram botda ro'yxatdan o'tadi va Fazo filiallaridan olgan fiskal chekining QR kodini skanerlaydi. Chek iiko savdo ma'lumoti bilan solishtiriladi, keyin filial qoidasi bo'yicha kupon beriladi.
 
@@ -87,7 +87,7 @@ To'liq ro'yxat [.env.example](.env.example) da. Asosiylari:
 | `BOT_TOKEN`, `BOT_USERNAME` | @FazoClub_bot |
 | `BOT_MODE` | `webhook` (prod), `polling` (lokal), `off` |
 | `BOT_WEBHOOK_SECRET` | Telegram webhook sarlavhasi uchun. Yaratish: `openssl rand -hex 24` |
-| `ADMIN_ALERT_CHAT_ID` | "Fazo Club \| Alert" guruhi. Guruhga `/chatid` yozib bilib olinadi |
+| `ADMIN_ALERT_CHAT_ID` | "Fazo Group \| Alert" guruhi. Guruhga `/chatid` yozib bilib olinadi |
 | `JWT_SECRET` | Admin sessiyasi uchun. Yaratish: `openssl rand -base64 48` |
 | `ADMIN_INIT_LOGIN/PASSWORD` | Birinchi ishga tushishda shu ma'lumot bilan ADMIN yaratiladi |
 | `POSTGRES_PASSWORD` | Prod Postgres paroli |
@@ -140,7 +140,7 @@ Bazaga kirish:
 ssh fazo 'cd /opt/fazo-club && docker compose exec postgres psql -U fazo fazo_club'
 ```
 
-RestoBrain admin menyusiga "Fazo Club" tashqi havolasini qo'shing (`https://club.fazorestaurant.uz/admin`). Kirish shu servisning o'z login/paroli bilan bo'ladi.
+RestoBrain admin menyusiga "Fazo Group" tashqi havolasini qo'shing (`https://club.fazorestaurant.uz/admin`). Kirish shu servisning o'z login/paroli bilan bo'ladi.
 
 ## iiko ulash
 

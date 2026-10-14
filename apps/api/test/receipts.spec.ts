@@ -158,7 +158,7 @@ describe('Chek qo\'shish', () => {
     expect(body.coupons).toBe(0);
     expect(body.receipts.length).toBeGreaterThanOrEqual(3);
     expect(body.receipts[0].branch === null || typeof body.receipts[0].branch.name === 'string').toBe(true);
-    expect(body.campaign.name).toBe('Omad Fazosi');
+    expect(body.campaign.name).toBe((await prisma.campaign.findFirstOrThrow({ where: { isActive: true }, orderBy: { id: 'asc' } })).name);
   });
 
   it('bot: fiskal chek rasmi → endi qabul qilinmaydi, kassir QR\'i so\'raladi', async () => {
@@ -171,7 +171,7 @@ describe('Chek qo\'shish', () => {
     const before = await prisma.receipt.count();
     await t.send(photoMessage(BASE + 4, 'BIG_PHOTO'));
     const reply = t.calls.filter((c) => c.method === 'sendMessage').pop();
-    expect(reply?.payload.text).toContain('Fazo Club QR');
+    expect(reply?.payload.text).toContain('Fazo Group QR');
     expect(await prisma.receipt.count()).toBe(before);
   });
 

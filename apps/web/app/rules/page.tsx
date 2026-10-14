@@ -1,7 +1,7 @@
 import { fmtDate, fmtSum } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Qoidalar — Omad Fazosi' };
+export const metadata = { title: 'Qoidalar — “KIA SONET MENIKI”' };
 
 interface PublicCampaign {
   name: string;

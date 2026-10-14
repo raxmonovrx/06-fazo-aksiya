@@ -8,11 +8,11 @@ import { tashkentToUtc } from './core/time.js';
 const prisma = new PrismaClient();
 
 const RULES = [
-  '"Omad Fazosi" aksiyasi qoidalari (qisqacha):',
-  "1. Fazo Group filiallarida to'lovdan keyin kassir Fazo Club QR'ini beradi.",
+  '“KIA SONET MENIKI” aksiyasi qoidalari (qisqacha):',
+  "1. Fazo Group filiallarida to'lovdan keyin kassir Fazo Group QR'ini beradi.",
   "2. QR'ni 72 soat ichida telefon kamerasi bilan skanerlang va botda «Start»ni bosing.",
   "3. Kupon soni chek summasiga qarab filial qoidasi bo'yicha beriladi. Har bir QR faqat bir marta ishlaydi.",
-  "4. Kuponlar darhol qo'shiladi. Har oy sovg'alar, yil oxirida avtomobil o'ynaladi.",
+  "4. Kuponlar darhol qo'shiladi. Har oy sovg'alar, yil oxirida KIA Sonet avtomobili o'ynaladi.",
   "5. Fazo xodimlari ro'yxatdan o'tishi mumkin, lekin o'yinda qatnashmaydi.",
 ].join('\n');
 
@@ -20,18 +20,21 @@ const BRANCHES = [
   {
     name: 'Fazo Restaurant',
     brand: 'Fazo',
+    minSum: 300_000,
     iikoRef: { host: 'https://fazo-co.iiko.it', department: 'Fazo Family Restauraunt' },
     devices: [{ fm: 'LG420230613349', legalName: '"Fazo DT" MChJ', stir: '312163993' }],
   },
   {
     name: 'Le Fazo',
     brand: 'Le Fazo',
+    minSum: 200_000,
     iikoRef: { host: 'https://fazo-co.iiko.it', department: 'Le Fazo' },
     devices: [],
   },
   {
     name: 'Boy Bobo',
     brand: "To'raxon Boybobo choyxonasi",
+    minSum: 200_000,
     iikoRef: { host: 'https://to-raxon-boy-bobo-choyxonasi.iiko.it', department: "To'raxon Boybobo Choyxonasi" },
     devices: [],
   },
@@ -41,7 +44,7 @@ async function main() {
   if (!(await prisma.campaign.findFirst())) {
     await prisma.campaign.create({
       data: {
-        name: 'Omad Fazosi',
+        name: 'KIA SONET MENIKI',
         startsAt: tashkentToUtc(2026, 10, 15)!,
         receiptWindowHours: 72,
         rulesText: RULES,
@@ -54,7 +57,7 @@ async function main() {
     let branch = await prisma.branch.findFirst({ where: { name: b.name } });
     if (!branch) {
       branch = await prisma.branch.create({
-        data: { name: b.name, brand: b.brand, iikoRef: b.iikoRef },
+        data: { name: b.name, brand: b.brand, minSum: b.minSum, iikoRef: b.iikoRef },
       });
       console.log(`+ filial ${b.name}`);
     }

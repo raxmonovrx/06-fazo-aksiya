@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Fazo Club mini app — bitta kompakt ekran, sahifa scroll bo'lmaydi.
+ * Fazo Group mini app — bitta kompakt ekran, sahifa scroll bo'lmaydi.
  *   yuqorida: kuponlar soni + "Qoidalar"
  *   o'rtada:  cheklar ro'yxati (faqat ro'yxat ichida suriladi)
  *   pastda:   Telegram MainButton — "QR'ni skanerlash"
@@ -162,7 +162,7 @@ export default function MiniApp() {
     }
     // Skaner bir QR'ni ketma-ket bir necha marta yuborishi mumkin — faqat birinchisi
     let done = false;
-    tg.showScanQrPopup({ text: "Kassir bergan Fazo Club QR'ini skanerlang" }, (text) => {
+    tg.showScanQrPopup({ text: "Kassir bergan Fazo Group QR'ini skanerlang" }, (text) => {
       if (done) return true;
       // Bizning QR (t.me/<bot>?start=v_…) yoki soliq cheki QR'i (tushuntirish uchun) — boshqasi e'tiborsiz
       if (!/start=v_|ofd\.soliq\.uz/i.test(text)) {
@@ -245,7 +245,7 @@ export default function MiniApp() {
   if (state === 'loading') return root(<div className="center"><Spinner /></div>);
   if (state !== 'ready' || !me) {
     const s = {
-      outside: { title: 'Telegram orqali oching', body: 'Bu sahifa Fazo Club botida ishlaydi.', btn: "Botga o'tish", on: () => (window.location.href = `https://t.me/${BOT}`) },
+      outside: { title: 'Telegram orqali oching', body: 'Bu sahifa Fazo Group botida ishlaydi.', btn: "Botga o'tish", on: () => (window.location.href = `https://t.me/${BOT}`) },
       unregistered: { title: "Avval ro'yxatdan o'ting", body: "Botda telefon raqamingizni yuboring va qoidalarga rozilik bering.", btn: "Botga o'tish", on: toBot },
       offline: { title: "Internet aloqasi yo'q", body: "Ulanishni tekshirib, qayta urinib ko'ring.", btn: 'Qayta urinish', on: () => { setState('loading'); void load(); } },
     }[state as 'outside' | 'unregistered' | 'offline'];
@@ -282,7 +282,7 @@ export default function MiniApp() {
         {me.receipts.length === 0 ? (
           <div className="empty">
             <p className="t-body">Hali chek yo&apos;q</p>
-            <p className="t-foot c-sub">To'lovdan keyin kassirdan Fazo Club QR'ini so'rang</p>
+            <p className="t-foot c-sub">To'lovdan keyin kassirdan Fazo Group QR'ini so'rang</p>
           </div>
         ) : (
           me.receipts.map((r) => <Row key={r.id} r={r} />)
@@ -352,9 +352,9 @@ function sheetFor(res: SubmitResult, hours: number): Sheet {
     case 'CANCELLED':
       return { tone: 'err', title: 'QR bekor qilingan', body: 'Kassirga murojaat qiling.' };
     case 'FISCAL_DISABLED':
-      return { tone: 'warn', title: 'Bu soliq cheki QR\'i', body: "Kupon uchun kassirdan Fazo Club QR'ini so'rang.", rescan: true };
+      return { tone: 'warn', title: 'Bu soliq cheki QR\'i', body: "Kupon uchun kassirdan Fazo Group QR'ini so'rang.", rescan: true };
     case 'INVALID':
-      return { tone: 'err', title: 'QR yaroqsiz', body: "Kassir bergan Fazo Club QR'ini skanerlang.", rescan: true };
+      return { tone: 'err', title: 'QR yaroqsiz', body: "Kassir bergan Fazo Group QR'ini skanerlang.", rescan: true };
     case 'RATE_LIMIT':
       return { tone: 'warn', title: "Juda ko'p urinish", body: "Birozdan keyin qayta urinib ko'ring." };
     case 'NO_CAMPAIGN':
@@ -380,7 +380,7 @@ function SheetView({ sheet }: { sheet: Sheet }) {
 
 function RulesSheet({ hours, rules, onBot }: { hours: number; rules: Me['rules']; onBot: () => void }) {
   const items: Array<[React.ReactNode, string, string]> = [
-    [<IconScan key="s" />, "Kassirdan QR oling", "To'lovdan keyin kassir Fazo Club QR'ini beradi"],
+    [<IconScan key="s" />, "Kassirdan QR oling", "To'lovdan keyin kassir Fazo Group QR'ini beradi"],
     [<IconTime key="t" />, `${hours} soat ichida skanerlang`, "Telefon kamerasi yoki shu yerdagi skaner bilan"],
     [
       <IconTicket key="k" />,
@@ -389,7 +389,7 @@ function RulesSheet({ hours, rules, onBot }: { hours: number; rules: Me['rules']
         ? `Chek kamida ${sum(rules.minSum)} so'm. Kupon darhol qo'shiladi`
         : "Skanerlashingiz bilan kupon qo'shiladi",
     ],
-    [<IconGift key="g" />, 'Sovrinlar', "Har oy sovg'alar, yil oxirida avtomobil"],
+    [<IconGift key="g" />, 'Sovrinlar', "Har oy sovg'alar, yil oxirida KIA Sonet"],
   ];
   return (
     <div className="sheet-body">

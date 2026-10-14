@@ -34,7 +34,7 @@ const dt = (iso: string) =>
 export function ticketHtml(v: PrintableVoucher, paper: PaperWidth): string {
   const width = paper === 80 ? 72 : 48; // chop etiladigan kenglik (mm)
   const qr = paper === 80 ? 52 : 40;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Fazo Club #${v.id}</title><style>
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Fazo Group #${v.id}</title><style>
 @page { size: ${paper}mm auto; margin: 0; }
 * { box-sizing: border-box; }
 body { margin: 0; width: ${paper}mm; font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; color: #000; }
@@ -49,8 +49,8 @@ body { margin: 0; width: ${paper}mm; font-family: -apple-system, 'Segoe UI', Rob
 .hint { font-size: 12px; font-weight: 600; line-height: 1.35; }
 .small { font-size: 10px; margin-top: 1.5mm; }
 </style></head><body><div class="t">
-<div class="brand">FAZO CLUB</div>
-<div class="sub">Fazo Group</div>
+<div class="brand">FAZO GROUP</div>
+<div class="sub">“KIA SONET MENIKI” aksiyasi</div>
 <div class="hr"></div>
 <div class="big">${v.couponsCount} KUPON</div>
 <div class="row">${esc(v.branchName)} · ${sum(v.amount)} so'm</div>

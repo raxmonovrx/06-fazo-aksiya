@@ -104,7 +104,7 @@ export function NavUser({ login, role }: Pick<AdminMe, 'login' | 'role'>) {
                 <div className="grid min-w-0 flex-1 gap-0.5 leading-tight">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium">
-                      Fazo Club
+                      Fazo Group
                     </span>
                     <span className="ml-auto shrink-0 rounded-md bg-sidebar-primary/15 px-1.5 py-0.5 text-[11px] leading-none font-medium text-sidebar-primary">
                       {roleLabel(role)}

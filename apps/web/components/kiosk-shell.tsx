@@ -31,7 +31,7 @@ export function KioskShell({ children }: { children: ReactNode }) {
             F
           </span>
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-base font-bold">{me.branch?.name ?? 'Fazo Club'}</div>
+            <div className="truncate text-base font-bold">{me.branch?.name ?? 'Fazo Group'}</div>
             <div className="truncate text-xs text-muted-foreground">
               {me.login} · {roleLabel(me.role)}
             </div>

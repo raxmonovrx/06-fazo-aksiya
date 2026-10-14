@@ -5,7 +5,7 @@ export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 p-6 text-center">
       <div className="text-5xl">🚗</div>
-      <h1 className="text-3xl font-bold">Omad Fazosi</h1>
+      <h1 className="text-3xl font-bold">“KIA SONET MENIKI”</h1>
       <p className="text-neutral-600">Ovqatlan — mashina yut! Fazo filiallaridagi har bir chek uchun kupon oling.</p>
       <a
         href={`https://t.me/${bot}`}

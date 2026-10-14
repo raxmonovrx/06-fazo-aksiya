@@ -119,5 +119,5 @@ export function pageTrail(pathname: string): {
   const sub = section?.items?.find((i) => i.url === pathname)?.title;
   if (sub) return { section, title: sub };
   if (section) return { section, title: section.title };
-  return { title: 'Fazo Club' };
+  return { title: 'Fazo Group' };
 }

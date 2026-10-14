@@ -27,10 +27,10 @@ export function redeemMessage(r: RedeemResult): string {
     case 'BLOCKED':
       return `⛔️ Akkauntingiz bloklangan.`;
     default:
-      return `❌ QR yaroqsiz. Kassirdan berilgan Fazo Club QR'ini skanerlang.`;
+      return `❌ QR yaroqsiz. Kassirdan berilgan Fazo Group QR'ini skanerlang.`;
   }
 }
 
 export const FISCAL_DISABLED =
-  `Bu soliq cheki QR'i 🙂\nKupon olish uchun kassirdan <b>Fazo Club QR</b>'ini so'rang va telefon kamerasi bilan skanerlang.`;
-export const PHOTO_NO_QR = `Rasmda Fazo Club QR'i topilmadi.\nKassir bergan QR'ni telefon kamerasi bilan skanerlang.`;
+  `Bu soliq cheki QR'i 🙂\nKupon olish uchun kassirdan <b>Fazo Group QR</b>'ini so'rang va telefon kamerasi bilan skanerlang.`;
+export const PHOTO_NO_QR = `Rasmda Fazo Group QR'i topilmadi.\nKassir bergan QR'ni telefon kamerasi bilan skanerlang.`;

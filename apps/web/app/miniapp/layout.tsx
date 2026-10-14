@@ -1,6 +1,6 @@
 import Script from 'next/script';
 
-export const metadata = { title: 'Fazo Club' };
+export const metadata = { title: 'Fazo Group' };
 // HTML keshlanmasin: Telegram WebView eski sahifani (eski JS havolalari bilan) ochib qolmasin.
 // /_next/static fayllari hash'li — ular baribir uzoq keshlanadi.
 export const dynamic = 'force-dynamic';

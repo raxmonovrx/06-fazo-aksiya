@@ -64,7 +64,7 @@ export default function LoginPage() {
           F
         </span>
         <div className="grid leading-tight">
-          <span className="text-sm font-semibold">Fazo Club</span>
+          <span className="text-sm font-semibold">Fazo Group</span>
           <span className="text-xs text-muted-foreground">Admin panel</span>
         </div>
       </div>

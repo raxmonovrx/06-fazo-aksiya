@@ -21,7 +21,7 @@ export async function createTestApp() {
     botInfo: {
       id: 123456,
       is_bot: true,
-      first_name: 'Fazo Club',
+      first_name: 'Fazo Group',
       username: 'FazoClub_bot',
       can_join_groups: true,
       can_read_all_group_messages: false,

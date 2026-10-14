@@ -85,7 +85,7 @@ export default function PanelLayout({
       <DashboardShell sidebar={<AppSidebar />}>
         {children}
         <footer className="mt-auto pt-4 text-[11px] text-muted-foreground">
-          Fazo Club <span className="mx-1.5">·</span>
+          Fazo Group <span className="mx-1.5">·</span>
           <a
             href="https://raxmonovrx.uz"
             target="_blank"

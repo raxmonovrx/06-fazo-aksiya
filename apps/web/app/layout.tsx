@@ -9,7 +9,7 @@ const geistSans = Geist({ subsets: ['latin', 'cyrillic'], variable: '--font-geis
 const geistMono = Geist_Mono({ subsets: ['latin', 'cyrillic'], variable: '--font-geist-mono' });
 
 export const metadata: Metadata = {
-  title: 'Fazo Club — Omad Fazosi',
+  title: 'Fazo Group — “KIA SONET MENIKI”',
   description: 'Ovqatlan — mashina yut! Fazo Group aksiyasi',
   robots: { index: false, follow: false },
 };

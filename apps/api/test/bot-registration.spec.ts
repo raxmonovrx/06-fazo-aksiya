@@ -46,7 +46,7 @@ describe('Bot: ro\'yxatdan o\'tish', () => {
     expect(ask?.reply_markup.keyboard[0][0].request_contact).toBe(true);
 
     await t.send(contactMessage(uid, '998990000001'));
-    expect(lastText()?.text).toContain("Fazo Club'ga xush kelibsiz");
+    expect(lastText()?.text).toContain("Fazo Group'ga xush kelibsiz");
     expect(t.calls.some((c) => c.payload.reply_markup?.inline_keyboard?.flat().some((b: any) => b.callback_data === 'rules:accept'))).toBe(false);
     // Doimiy klaviatura yo'q — faqat inline tugmalar; eski klaviatura olib tashlanadi
     const buttons = lastText()?.reply_markup.inline_keyboard.flat();
