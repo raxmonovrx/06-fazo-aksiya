@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { isHttps } from '../config.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RateLimiter } from '../receipts/rate-limiter.js';
-import { ADMIN_COOKIE, AdminGuard, CurrentAdmin, SESSION_HOURS, signAdminToken } from './auth.js';
+import { ADMIN_COOKIE, AdminGuard, CurrentAdmin, Roles, SESSION_HOURS, signAdminToken } from './auth.js';
 import { AuditService } from './audit.service.js';
 import { parse } from './zod.js';
 
@@ -39,7 +39,7 @@ export class AdminAuthController {
       maxAge: SESSION_HOURS * 60 * 60 * 1000,
     });
     await this.audit.log(user.id, 'auth.login', 'admin', user.id, { ip: req.ip });
-    return { id: user.id, login: user.login, role: user.role };
+    return { id: user.id, login: user.login, role: user.role, branchId: user.branchId };
   }
 
   @Post('logout')
@@ -51,7 +51,11 @@ export class AdminAuthController {
 
   @Get('me')
   @UseGuards(AdminGuard)
-  me(@CurrentAdmin() admin: AdminUser) {
-    return { id: admin.id, login: admin.login, role: admin.role };
+  @Roles('ADMIN', 'OPERATOR', 'CASHIER')
+  async me(@CurrentAdmin() admin: AdminUser) {
+    const branch = admin.branchId
+      ? await this.prisma.branch.findUnique({ where: { id: admin.branchId }, select: { id: true, name: true } })
+      : null;
+    return { id: admin.id, login: admin.login, role: admin.role, branch };
   }
 }

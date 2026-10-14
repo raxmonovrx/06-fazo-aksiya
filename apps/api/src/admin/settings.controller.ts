@@ -17,14 +17,19 @@ const campaignSchema = z.object({
   receiptWindowHours: z.coerce.number().int().min(1).max(24 * 30).optional(),
   rulesText: z.string().max(20_000).optional(),
 });
-const userSchema = z.object({
-  login: z.string().trim().min(3).max(32).regex(/^[a-z0-9._-]+$/i),
-  password: z.string().min(8).max(200),
-  role: z.enum(['ADMIN', 'OPERATOR']),
-});
+const roleSchema = z.enum(['ADMIN', 'OPERATOR', 'CASHIER']);
+const userSchema = z
+  .object({
+    login: z.string().trim().min(3).max(32).regex(/^[a-z0-9._-]+$/i),
+    password: z.string().min(8).max(200),
+    role: roleSchema,
+    branchId: z.number().int().nullable().optional(),
+  })
+  .refine((u) => u.role !== 'CASHIER' || u.branchId, { message: 'Kassir uchun filialni tanlang', path: ['branchId'] });
 const userPatchSchema = z.object({
   password: z.string().min(8).max(200).optional(),
-  role: z.enum(['ADMIN', 'OPERATOR']).optional(),
+  role: roleSchema.optional(),
+  branchId: z.number().int().nullable().optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -94,7 +99,10 @@ export class SettingsController {
   @Get('users')
   @Roles('ADMIN')
   users() {
-    return this.prisma.adminUser.findMany({ select: { id: true, login: true, role: true, isActive: true, createdAt: true }, orderBy: { id: 'asc' } });
+    return this.prisma.adminUser.findMany({
+      select: { id: true, login: true, role: true, isActive: true, createdAt: true, branchId: true, branch: { select: { id: true, name: true } } },
+      orderBy: { id: 'asc' },
+    });
   }
 
   @Post('users')
@@ -103,10 +111,15 @@ export class SettingsController {
     const data = parse(userSchema, body);
     try {
       const u = await this.prisma.adminUser.create({
-        data: { login: data.login, role: data.role, passwordHash: await bcrypt.hash(data.password, 12) },
+        data: {
+          login: data.login,
+          role: data.role,
+          branchId: data.role === 'CASHIER' ? data.branchId : (data.branchId ?? null),
+          passwordHash: await bcrypt.hash(data.password, 12),
+        },
       });
-      await this.audit.log(admin.id, 'admin.create', 'admin', u.id, { login: u.login, role: u.role });
-      return { id: u.id, login: u.login, role: u.role };
+      await this.audit.log(admin.id, 'admin.create', 'admin', u.id, { login: u.login, role: u.role, branchId: u.branchId });
+      return { id: u.id, login: u.login, role: u.role, branchId: u.branchId };
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw new ConflictException('Bu login band');
       throw e;
@@ -125,6 +138,7 @@ export class SettingsController {
         where: { id },
         data: {
           role: data.role,
+          branchId: data.branchId,
           isActive: data.isActive,
           ...(data.password && { passwordHash: await bcrypt.hash(data.password, 12) }),
         },
@@ -132,6 +146,7 @@ export class SettingsController {
       .catch(() => null);
     if (!u) throw new NotFoundException();
     await this.audit.log(admin.id, 'admin.update', 'admin', id, { ...data, password: data.password ? '***' : undefined });
-    return { id: u.id, login: u.login, role: u.role, isActive: u.isActive };
+    if (u.role === 'CASHIER' && !u.branchId) throw new BadRequestException('Kassir uchun filialni tanlang');
+    return { id: u.id, login: u.login, role: u.role, isActive: u.isActive, branchId: u.branchId };
   }
 }

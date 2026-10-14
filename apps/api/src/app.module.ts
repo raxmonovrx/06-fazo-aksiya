@@ -11,6 +11,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { ReceiptsModule } from './receipts/receipts.module.js';
 import { ReconcileModule } from './reconcile/reconcile.module.js';
 import { TelegramModule } from './telegram/telegram.module.js';
+import { VouchersModule } from './vouchers/vouchers.module.js';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { TelegramModule } from './telegram/telegram.module.js';
     ReconcileModule,
     AdminModule,
     JobsModule,
+    VouchersModule,
   ],
   controllers: [HealthController],
 })

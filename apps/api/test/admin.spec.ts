@@ -2,7 +2,6 @@ import bcrypt from 'bcryptjs';
 import ExcelJS from 'exceljs';
 import { PrismaClient } from '@prisma/client';
 
-import { signInitData } from '../src/core/init-data.js';
 import { ReceiptsService } from '../src/receipts/receipts.service.js';
 import { createTestApp } from './helpers.js';
 
@@ -57,15 +56,11 @@ describe('Admin panel API + solishtirish', () => {
       body: init.json !== undefined ? JSON.stringify(init.json) : init.body,
     });
 
-  const submit = (n: number, text: string) =>
-    fetch(`${t.baseUrl}/miniapp/receipts`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `tma ${signInitData({ auth_date: String(Math.floor(Date.now() / 1000)), user: JSON.stringify({ id: BASE + n }) }, TOKEN)}`,
-      },
-      body: JSON.stringify({ text }),
-    }).then((r) => r.json());
+  // Fiskal chek oqimi (2026-10-14 dan mini app'da o'chirilgan) — servis orqali
+  const submit = async (n: number, text: string) => {
+    const participant = await prisma.participant.findUniqueOrThrow({ where: { tgId: BigInt(BASE + n) } });
+    return JSON.parse(JSON.stringify(await t.app.get(ReceiptsService).submit({ participant, text, source: 'QR' })));
+  };
 
   beforeAll(async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: NOW });

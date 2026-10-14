@@ -6,7 +6,9 @@ import { CampaignService } from '../campaign/campaign.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ParticipantsService } from '../participants/participants.service.js';
 import { RateLimiter } from '../receipts/rate-limiter.js';
+import { parseVoucherToken } from '../core/voucher-token.js';
 import { ReceiptsService } from '../receipts/receipts.service.js';
+import { VouchersService } from '../vouchers/vouchers.service.js';
 import { BOT } from '../telegram/bot.token.js';
 import { MiniappGuard, type MiniappRequest } from './miniapp.guard.js';
 
@@ -23,6 +25,7 @@ export class MiniappController {
     private readonly participants: ParticipantsService,
     private readonly campaigns: CampaignService,
     private readonly prisma: PrismaService,
+    private readonly vouchers: VouchersService,
   ) {}
 
   @Get('me')
@@ -55,12 +58,22 @@ export class MiniappController {
     };
   }
 
+  /**
+   * Skaner natijasi. 2026-10-14 dan asosiy oqim — kassir bergan vaucher QR'i
+   * (t.me/<bot>?start=v_<token>). Fiskal chek QR'i o'chirilgan.
+   */
   @Post('receipts')
   @HttpCode(200)
   async submit(@Req() req: MiniappRequest, @Body() body: unknown) {
     const parsed = submitSchema.safeParse(body);
     const text = parsed.success ? parsed.data.text : '';
-    return this.receipts.submit({ participant: req.participant, text, source: 'QR' });
+    const token = parseVoucherToken(text);
+    if (token) {
+      const r = await this.vouchers.redeem(req.participant, token);
+      return { code: r.code, couponsCount: r.couponsCount, amount: r.amount, branchName: r.branchName, totalCoupons: r.totalCoupons, isStaff: r.isStaff };
+    }
+    if (/ofd\.soliq\.uz/i.test(text)) return { code: 'FISCAL_DISABLED' };
+    return { code: 'INVALID' };
   }
 
   /** "Chek rasmini botga yuborish": bot chatga yo'riqnoma yuboradi, mini app esa yopiladi. */

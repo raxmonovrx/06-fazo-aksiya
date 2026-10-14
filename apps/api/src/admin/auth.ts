@@ -33,7 +33,8 @@ export function signAdminToken(user: Pick<AdminUser, 'id' | 'role'>) {
 }
 
 const ROLES_KEY = 'adminRoles';
-/** Faqat ko'rsatilgan rollar. Berilmasa — ADMIN va OPERATOR ikkalasi. */
+const DEFAULT_ROLES: AdminRole[] = ['ADMIN', 'OPERATOR'];
+/** Faqat ko'rsatilgan rollar. Berilmasa — ADMIN va OPERATOR (CASHIER emas). */
 export const Roles = (...roles: AdminRole[]) => SetMetadata(ROLES_KEY, roles);
 
 export const CurrentAdmin = createParamDecorator((_: unknown, ctx: ExecutionContext) => {
@@ -64,7 +65,10 @@ export class AdminGuard implements CanActivate {
       ctx.getHandler(),
       ctx.getClass(),
     ]);
-    if (roles?.length && !roles.includes(user.role)) throw new ForbiddenException();
+    // @Roles berilmagan endpoint'lar — ADMIN va OPERATOR uchun. CASHIER faqat
+    // aniq ruxsat berilgan joylarga (vaucherlar) kiradi.
+    const allowed = roles?.length ? roles : DEFAULT_ROLES;
+    if (!allowed.includes(user.role)) throw new ForbiddenException();
     req.admin = user;
     return true;
   }

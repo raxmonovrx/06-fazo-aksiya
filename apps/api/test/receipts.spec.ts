@@ -53,6 +53,13 @@ describe('Chek qo\'shish', () => {
   let t: Awaited<ReturnType<typeof createTestApp>>;
   let receipts: ReceiptsService;
 
+  // Fiskal chek oqimi (mini app'da o'chirilgan, servis saqlangan) — servis orqali
+  const fiscal = async (n: number, text: string) => {
+    const participant = await prisma.participant.findUniqueOrThrow({ where: { tgId: BigInt(BASE + n) } });
+    const body = JSON.parse(JSON.stringify(await receipts.submit({ participant, text, source: 'QR' })));
+    return { status: 200, json: async () => body };
+  };
+
   const post = (n: number, text: string, auth = `tma ${initData(n)}`) =>
     fetch(`${t.baseUrl}/miniapp/receipts`, {
       method: 'POST',
@@ -79,8 +86,8 @@ describe('Chek qo\'shish', () => {
     receipts.perDay.reset();
   });
 
-  it('mini app: real formatdagi QR → PENDING, Fazo filiali', async () => {
-    const res = await post(1, qr(1));
+  it('fiskal servis: real formatdagi QR → PENDING, Fazo filiali', async () => {
+    const res = await fiscal(1, qr(1));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.code).toBe('ACCEPTED');
@@ -91,17 +98,17 @@ describe('Chek qo\'shish', () => {
   });
 
   it('takror: o\'zi → ALREADY_YOURS, boshqasi → DUPLICATE', async () => {
-    const mine = await (await post(1, qr(1))).json();
+    const mine = await (await fiscal(1, qr(1))).json();
     expect(mine.code).toBe('ALREADY_YOURS');
     expect(mine.receipt).toMatchObject({ branchName: 'Fazo Restaurant', status: 'PENDING' });
-    const other = await (await post(2, qr(1))).json();
+    const other = await (await fiscal(2, qr(1))).json();
     expect(other.code).toBe('DUPLICATE');
     expect(other.receipt).toBeUndefined();
     expect(other.message).toContain('allaqachon qo\'shilgan');
   });
 
   it('noma\'lum FM → NEEDS_REVIEW, ro\'yxatga tushadi, admin ogohlantiriladi', async () => {
-    const body = await (await post(1, qr(2, { fm: 'ZZTEST00000001' }))).json();
+    const body = await (await fiscal(1, qr(2, { fm: 'ZZTEST00000001' }))).json();
     expect(body.code).toBe('REVIEW');
     const r = await prisma.receipt.findUniqueOrThrow({ where: { id: body.receipt.id } });
     expect(r).toMatchObject({ status: 'NEEDS_REVIEW', rejectCode: 'UNKNOWN_FM', branchId: null });
@@ -111,7 +118,7 @@ describe('Chek qo\'shish', () => {
   });
 
   it('aksiyadan oldingi chek → REJECTED saqlanadi', async () => {
-    const body = await (await post(1, qr(3, { c: '20261014230000' }))).json();
+    const body = await (await fiscal(1, qr(3, { c: '20261014230000' }))).json();
     expect(body.code).toBe('BEFORE_CAMPAIGN');
     expect(body.message).toContain('15.10.2026');
     const r = await prisma.receipt.findUniqueOrThrow({ where: { id: body.receipt.id } });
@@ -120,14 +127,14 @@ describe('Chek qo\'shish', () => {
 
   it('muddati o\'tgan chek (72 soat) → WINDOW_EXPIRED', async () => {
     vi.setSystemTime(new Date('2026-10-19T07:00:01Z'));
-    const body = await (await post(1, qr(4, { c: '20261016120000' }))).json();
+    const body = await (await fiscal(1, qr(4, { c: '20261016120000' }))).json();
     vi.setSystemTime(NOW);
     expect(body.code).toBe('WINDOW_EXPIRED');
   });
 
   it('QR emas → INVALID_QR, chek yaratilmaydi', async () => {
     const before = await prisma.receipt.count();
-    const body = await (await post(1, 'https://instagram.com/fazo')).json();
+    const body = await (await fiscal(1, 'https://instagram.com/fazo')).json();
     expect(body.code).toBe('INVALID_QR');
     expect(await prisma.receipt.count()).toBe(before);
   });
@@ -140,7 +147,7 @@ describe('Chek qo\'shish', () => {
 
   it('rate limit: daqiqasiga 5 tadan ortiq → RATE_LIMIT', async () => {
     const codes: string[] = [];
-    for (let i = 0; i < 6; i++) codes.push((await (await post(3, `nonsense-${i}`)).json()).code);
+    for (let i = 0; i < 6; i++) codes.push((await (await fiscal(3, `nonsense-${i}`)).json()).code);
     expect(codes.slice(0, 5).every((c) => c === 'INVALID_QR')).toBe(true);
     expect(codes[5]).toBe('RATE_LIMIT');
   });
@@ -154,28 +161,33 @@ describe('Chek qo\'shish', () => {
     expect(body.campaign.name).toBe('Omad Fazosi');
   });
 
-  it('bot: chek rasmi → QR dekodlanadi → PENDING (PHOTO)', async () => {
+  it('bot: fiskal chek rasmi → endi qabul qilinmaydi, kassir QR\'i so\'raladi', async () => {
     const png = await QRCode.toBuffer(qr(10), { width: 300 });
     const photo = await sharp({ create: { width: 900, height: 1400, channels: 3, background: '#fff' } })
       .composite([{ input: png, top: 800, left: 300 }])
       .jpeg()
       .toBuffer();
     vi.spyOn(t.app.get(ReceiptsBotHandlers) as any, 'download').mockResolvedValueOnce(photo);
+    const before = await prisma.receipt.count();
     await t.send(photoMessage(BASE + 4, 'BIG_PHOTO'));
     const reply = t.calls.filter((c) => c.method === 'sendMessage').pop();
-    expect(reply?.payload.text).toContain('Chek qabul qilindi');
-    const r = await prisma.receipt.findFirstOrThrow({ where: { receiptNumber: String(RUN + 10) } });
-    expect(r).toMatchObject({ source: 'PHOTO', status: 'PENDING', photoFileId: 'BIG_PHOTO' });
+    expect(reply?.payload.text).toContain('Fazo Club QR');
+    expect(await prisma.receipt.count()).toBe(before);
   });
 
-  it('bot: o\'qilmaydigan rasm → NEEDS_REVIEW (QR_UNREADABLE)', async () => {
+  it('bot: QR\'siz rasm → yo\'riqnoma, moderatsiyaga tushmaydi', async () => {
     const blank = await sharp({ create: { width: 600, height: 600, channels: 3, background: '#ddd' } }).jpeg().toBuffer();
     vi.spyOn(t.app.get(ReceiptsBotHandlers) as any, 'download').mockResolvedValueOnce(blank);
+    const before = await prisma.receipt.count();
     await t.send(photoMessage(BASE + 5, 'BLANK'));
     const reply = t.calls.filter((c) => c.method === 'sendMessage').pop();
-    expect(reply?.payload.text).toContain("o'qib bo'lmadi");
-    const r = await prisma.receipt.findFirstOrThrow({ where: { photoFileId: 'BLANK', participant: { tgId: BigInt(BASE + 5) } } });
-    expect(r).toMatchObject({ status: 'NEEDS_REVIEW', rejectCode: 'QR_UNREADABLE', fm: null });
+    expect(reply?.payload.text).toContain("QR'i topilmadi");
+    expect(await prisma.receipt.count()).toBe(before);
+  });
+
+  it('mini app: fiskal QR → FISCAL_DISABLED', async () => {
+    const body = await (await post(1, qr(11))).json();
+    expect(body.code).toBe('FISCAL_DISABLED');
   });
 
   it('photo-hint: bot chatga yo\'riqnoma yuboradi', async () => {

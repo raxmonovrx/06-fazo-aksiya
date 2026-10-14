@@ -52,8 +52,13 @@ export class ParticipantsService {
       return this.prisma.participant.update({ where: { tgId }, data: profile });
     }
 
-    const raw = payload?.trim().slice(0, 64) || null;
+    let raw = payload?.trim().slice(0, 64) || null;
     let source: string | null = null;
+    // Vaucher QR orqali kelgan — tokenning o'zi saqlanmaydi (u vaucher jadvalida)
+    if (raw?.startsWith('v_')) {
+      raw = 'v_';
+      source = 'voucher';
+    }
     let referredById: number | null = null;
     if (raw?.startsWith('src_')) source = raw.slice(4) || null;
     if (raw?.startsWith('ref_')) {
@@ -123,6 +128,19 @@ export class ParticipantsService {
     ]);
     const receipts = Object.fromEntries(byStatus.map((r) => [r.status, r._count._all]));
     return { coupons, receipts };
+  }
+
+  /** Ro'yxatdan o'tmasdan skanerlangan vaucher tokeni (oxirgisi saqlanadi). */
+  setPendingVoucher(tgId: number, token: string) {
+    return this.prisma.participant.update({ where: { tgId: BigInt(tgId) }, data: { pendingVoucher: token } });
+  }
+
+  /** Kutayotgan vaucherni oladi va tozalaydi. */
+  async takePendingVoucher(participantId: number): Promise<string | null> {
+    const p = await this.prisma.participant.findUnique({ where: { id: participantId }, select: { pendingVoucher: true } });
+    if (!p?.pendingVoucher) return null;
+    await this.prisma.participant.update({ where: { id: participantId }, data: { pendingVoucher: null } });
+    return p.pendingVoucher;
   }
 }
 

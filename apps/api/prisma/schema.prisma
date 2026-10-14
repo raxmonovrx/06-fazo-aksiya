@@ -48,6 +48,8 @@ model Branch {
   devices     FiscalDevice[]
   receipts    Receipt[]
   saleRecords SaleRecord[]
+  vouchers    Voucher[]
+  admins      AdminUser[]
 
   @@map("branches")
 }
@@ -79,6 +81,8 @@ model Participant {
   referredById    Int?
   // /start payload: src_<tag> yoki ref_<code> — xom holda
   startPayload    String?
+  // Ro'yxatdan o'tmasdan skanerlangan vaucher — ro'yxatdan o'tgach avtomatik qo'llanadi
+  pendingVoucher  String?
   source          String?
   isStaff         Boolean   @default(false)
   isBlocked       Boolean   @default(false)
@@ -94,6 +98,7 @@ model Participant {
   coupons       Coupon[]
   notifications Notification[]
   scanLogs      ScanLog[]
+  vouchers      Voucher[]
 
   @@map("participants")
 }
@@ -102,6 +107,8 @@ enum ReceiptSource {
   QR
   PHOTO
   MANUAL
+  // Kassir chiqargan vaucher QR'i orqali (asosiy oqim, 2026-10-14 dan)
+  VOUCHER
 }
 
 enum ReceiptStatus {
@@ -143,6 +150,7 @@ model Receipt {
   saleRecord  SaleRecord? @relation(fields: [saleRecordId], references: [id])
   reviewedBy  AdminUser?  @relation(fields: [reviewedById], references: [id])
   coupons     Coupon[]
+  voucher     Voucher?
 
   @@unique([fm, receiptNumber])
   @@index([status])
@@ -230,6 +238,8 @@ model StaffPhone {
 enum AdminRole {
   ADMIN
   OPERATOR
+  // Faqat "Kassa" sahifasi: o'z filialida vaucher chiqaradi
+  CASHIER
 }
 
 model AdminUser {
@@ -237,12 +247,17 @@ model AdminUser {
   login        String    @unique
   passwordHash String
   role         AdminRole @default(OPERATOR)
+  // Kassir qaysi filialda ishlaydi (CASHIER uchun majburiy)
+  branchId     Int?
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now()) @db.Timestamptz(3)
 
-  reviewedReceipts Receipt[]
-  importBatches    ImportBatch[]
-  auditLogs        AuditLog[]
+  branch            Branch?       @relation(fields: [branchId], references: [id])
+  reviewedReceipts  Receipt[]
+  importBatches     ImportBatch[]
+  auditLogs         AuditLog[]
+  issuedVouchers    Voucher[]     @relation("VoucherIssuer")
+  cancelledVouchers Voucher[]     @relation("VoucherCanceller")
 
   @@map("admin_users")
 }
@@ -314,4 +329,56 @@ model Setting {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@map("settings")
+}
+
+enum VoucherStatus {
+  ISSUED
+  REDEEMED
+  CANCELLED
+}
+
+// Kassir chiqargan bir martalik QR. QR'da faqat tasodifiy token bor
+// (t.me/<bot>?start=v_<token>) — summa va kupon soni shu yerda, o'zgartirib bo'lmaydi.
+model Voucher {
+  id              Int           @id @default(autoincrement())
+  // crypto.randomBytes(16) base64url — 22 belgi, taxmin qilib bo'lmaydi
+  token           String        @unique
+  branchId        Int
+  amount          Decimal       @db.Decimal(14, 2)
+  couponsCount    Int
+  // Kassir kiritgan yozuv (tekshiruv uchun; QR telefonga bog'lanmaydi)
+  customerName    String?
+  customerPhone   String?
+  status          VoucherStatus @default(ISSUED)
+  issuedById      Int
+  issuedAt        DateTime      @default(now()) @db.Timestamptz(3)
+  expiresAt       DateTime      @db.Timestamptz(3)
+  redeemedById    Int?
+  redeemedAt      DateTime?     @db.Timestamptz(3)
+  // Skanerlagan Telegram akkaunt — o'sha paytdagi holati muhrlanadi (ishchilar
+  // soxta vaucher chiqarib o'zlari olishini aniqlash uchun; profil keyin o'zgarsa ham saqlanadi)
+  redeemedPhone   String?
+  redeemedTgId    BigInt?
+  redeemedName    String?
+  // Kassir yozgan raqam skanerlagan raqamdan farq qiladi (bloklamaydi, faqat belgi)
+  phoneMismatch   Boolean       @default(false)
+  // Skanerlagan odam xodimlar ro'yxatida
+  redeemedByStaff Boolean       @default(false)
+  receiptId       Int?          @unique
+  cancelledById   Int?
+  cancelledAt     DateTime?     @db.Timestamptz(3)
+  cancelReason    String?
+
+  branch      Branch       @relation(fields: [branchId], references: [id])
+  issuedBy    AdminUser    @relation("VoucherIssuer", fields: [issuedById], references: [id])
+  cancelledBy AdminUser?   @relation("VoucherCanceller", fields: [cancelledById], references: [id])
+  redeemedBy  Participant? @relation(fields: [redeemedById], references: [id])
+  receipt     Receipt?     @relation(fields: [receiptId], references: [id])
+
+  @@index([status])
+  @@index([issuedAt])
+  @@index([branchId, issuedAt])
+  @@index([issuedById, issuedAt])
+  @@index([redeemedPhone])
+  @@map("vouchers")
 }

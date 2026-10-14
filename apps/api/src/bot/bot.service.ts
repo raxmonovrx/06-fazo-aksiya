@@ -6,6 +6,9 @@ import { config, isHttps } from '../config.js';
 import { isRegistered, ParticipantsService } from '../participants/participants.service.js';
 import { BOT } from '../telegram/bot.token.js';
 import { BTN, T } from './texts.js';
+import { parseVoucherToken } from '../core/voucher-token.js';
+import { VouchersService } from '../vouchers/vouchers.service.js';
+import { PENDING_SAVED, redeemMessage } from '../vouchers/voucher-texts.js';
 
 @Injectable()
 export class BotService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -15,7 +18,14 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
   constructor(
     @Inject(BOT) private readonly bot: Bot,
     private readonly participants: ParticipantsService,
+    private readonly vouchers: VouchersService,
   ) {}
+
+  /** Vaucher QR'ini qo'llaydi va natijani yozadi. */
+  async redeemAndReply(ctx: Context, p: Participant, token: string) {
+    const res = await this.vouchers.redeem(p, token);
+    return ctx.reply(redeemMessage(res), { parse_mode: 'HTML' });
+  }
 
   /** Boshqa modullar (chek qo'shish) o'z handler'larini shu orqali ulaydi. */
   addHandlers(fn: (bot: Bot) => void) {
@@ -48,11 +58,15 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
   async sendHome(ctx: Context, p: Participant) {
     const tmp = await ctx.reply('…', { reply_markup: { remove_keyboard: true } }).catch(() => null);
     if (tmp) await ctx.api.deleteMessage(tmp.chat.id, tmp.message_id).catch(() => undefined);
-    return ctx.reply(T.home(ctx.from?.first_name), {
+    const home = await ctx.reply(T.home(ctx.from?.first_name), {
       parse_mode: 'HTML',
       link_preview_options: { is_disabled: true },
       reply_markup: this.homeKeyboard(p),
     });
+    // Ro'yxatdan o'tmasdan skanerlangan QR — endi qo'llanadi
+    const pending = await this.participants.takePendingVoucher(p.id);
+    if (pending) await this.redeemAndReply(ctx, p, pending);
+    return home;
   }
 
   async onApplicationBootstrap() {
@@ -120,8 +134,14 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
     const pm = bot.chatType('private');
 
     pm.command('start', async (ctx) => {
+      const token = parseVoucherToken(ctx.match);
       const p = await this.participants.startOrGet(ctx.from, ctx.match);
       if (p.isBlocked) return ctx.reply(T.blocked);
+      if (token && !isRegistered(p)) {
+        await this.participants.setPendingVoucher(ctx.from.id, token);
+        await ctx.reply(PENDING_SAVED);
+      }
+      if (token && isRegistered(p)) return this.redeemAndReply(ctx, p, token);
       if (!p.phone) {
         return ctx.reply(T.welcome(ctx.from.first_name), {
           parse_mode: 'HTML',

@@ -5,6 +5,8 @@ import { BotService } from '../bot/bot.service.js';
 import { config } from '../config.js';
 import { BOT } from '../telegram/bot.token.js';
 import { decodeQrFromImage } from './qr-decode.js';
+import { parseVoucherToken } from '../core/voucher-token.js';
+import { FISCAL_DISABLED, PHOTO_NO_QR } from '../vouchers/voucher-texts.js';
 import { ReceiptsService, type SubmitResult } from './receipts.service.js';
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
@@ -34,28 +36,30 @@ export class ReceiptsBotHandlers implements OnModuleInit {
             if ((msg.document.file_size ?? 0) > MAX_IMAGE_BYTES) return ctx.reply('Rasm juda katta (15 MB dan oshmasin).');
             fileId = msg.document.file_id;
           } else {
-            return ctx.reply("Chekning rasmini yuboring (JPG yoki PNG).");
+            return ctx.reply(PHOTO_NO_QR);
           }
-
           await ctx.replyWithChatAction('typing').catch(() => undefined);
           let text: string | null = null;
           try {
-            const buf = await this.download(fileId);
-            text = await decodeQrFromImage(buf);
+            text = await decodeQrFromImage(await this.download(fileId));
           } catch (e) {
             this.log.error(`Rasm yuklab olinmadi/o'qilmadi: ${(e as Error).message}`);
           }
-          const res = await this.receipts.submit({ participant: p, text, source: 'PHOTO', photoFileId: fileId });
-          return this.replyResult(ctx, res);
+          // Asosiy oqim — kassir bergan vaucher QR'i (2026-10-14 dan). Fiskal QR o'chirilgan.
+          const token = parseVoucherToken(text);
+          if (token) return this.botService.redeemAndReply(ctx, p, token);
+          if (text && /ofd\.soliq\.uz/i.test(text)) return ctx.reply(FISCAL_DISABLED, { parse_mode: 'HTML' });
+          return ctx.reply(PHOTO_NO_QR);
         }),
       );
 
-      // Foydalanuvchi QR havolasini matn qilib yuborsa (masalan, boshqa ilova bilan skanerlab)
-      pm.hears(/ofd\.soliq\.uz\/\S+/i, (ctx) =>
+      // Matn ko'rinishidagi havola: vaucher yoki (o'chirilgan) fiskal QR
+      pm.hears(/t\.me\/\S+start=v_|ofd\.soliq\.uz\/\S+/i, (ctx) =>
         this.botService.withParticipant(ctx, async (p) => {
-          const url = ctx.message!.text!.match(/https?:\/\/\S*ofd\.soliq\.uz\/\S+/i)?.[0] ?? ctx.message!.text!;
-          const res = await this.receipts.submit({ participant: p, text: url, source: 'QR' });
-          return this.replyResult(ctx, res);
+          const text = ctx.message!.text!;
+          const token = parseVoucherToken(text.match(/\S*start=v_\S+/)?.[0] ?? text);
+          if (token) return this.botService.redeemAndReply(ctx, p, token);
+          return ctx.reply(FISCAL_DISABLED, { parse_mode: 'HTML' });
         }),
       );
     });
