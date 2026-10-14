@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 
+import { ROLE_TEMPLATES } from '../src/admin/permissions.js';
 import { signInitData } from '../src/core/init-data.js';
 import { VouchersService } from '../src/vouchers/vouchers.service.js';
 import { callback, contactMessage, createTestApp, textMessage } from './helpers.js';
@@ -24,6 +25,7 @@ async function cleanup() {
   const admins = await prisma.adminUser.findMany({ where: { login: { startsWith: 'tv_' } }, select: { id: true } });
   const aid = { in: admins.map((a) => a.id) };
   await prisma.voucher.deleteMany({ where: { issuedById: aid } });
+  await prisma.terminal.deleteMany({ where: { name: { startsWith: 'tv_' } } });
   await prisma.coupon.deleteMany({ where: { participantId: pid } });
   await prisma.receipt.deleteMany({ where: { participantId: pid } });
   await prisma.participant.deleteMany({ where: { tgId: ids } });
@@ -60,9 +62,12 @@ describe('Vaucherlar (kassir QR)', () => {
       ['tv_kassa1', 'CASHIER', fazoId],
       ['tv_kassa2', 'CASHIER', leFazoId],
       ['tv_nobranch', 'CASHIER', null],
+      ['tv_manager', 'MANAGER', fazoId],
     ] as const;
     for (const [login, role, branchId] of users) {
-      await prisma.adminUser.create({ data: { login: `${login}_${RUN}`, role, branchId, passwordHash: hash } });
+      await prisma.adminUser.create({
+        data: { login: `${login}_${RUN}`, role, branchId, permissions: [...ROLE_TEMPLATES[role]], passwordHash: hash },
+      });
     }
     // Ro'yxatdan o'tgan: 1, 2; xodim: 3; 4 — ro'yxatdan o'tmagan (keyin o'tadi)
     for (const n of [1, 2, 3]) {
@@ -248,5 +253,93 @@ describe('Vaucherlar (kassir QR)', () => {
     expect(all.summary.REDEEMED.count).toBeGreaterThan(0);
     const flagged = await (await api('tv_op', '/vouchers?flagged=true&pageSize=200')).json();
     expect(flagged.items.every((i: any) => i.phoneMismatch || i.redeemedByStaff)).toBe(true);
+  });
+
+  it('kassa qurilmalari: admin qo\'shadi, kassir faqat o\'z filialinikini ko\'radi va tanlab chiqaradi', async () => {
+    const mk = async (branchId: number, name: string, output: string) =>
+      (await api('tv_admin', `/branches/${branchId}/terminals`, { method: 'POST', json: { name, output } })).json();
+    const k1 = await mk(fazoId, 'tv_Kassa 1', 'PRINT_80');
+    const sunmi = await mk(fazoId, 'tv_Sunmi', 'SCREEN');
+    const le = await mk(leFazoId, 'tv_Le kassa', 'PRINT_58');
+    await api('tv_admin', `/terminals/${sunmi.id}`, { method: 'PATCH', json: { isActive: false } });
+
+    const list = await (await api('tv_kassa1', `/terminals?branchId=${leFazoId}`)).json();
+    expect(list.map((x: any) => x.id)).toEqual([k1.id]); // o'z filiali, faqat faol
+    expect((await api('tv_kassa1', `/branches/${fazoId}/terminals`, { method: 'POST', json: { name: 'tv_x', output: 'SCREEN' } })).status).toBe(403);
+
+    expect((await api('tv_kassa1', '/vouchers', { method: 'POST', json: { amount: 200000, terminalId: le.id } })).status).toBe(400);
+    expect((await api('tv_kassa1', '/vouchers', { method: 'POST', json: { amount: 200000, terminalId: sunmi.id } })).status).toBe(400);
+    const v = await issue('tv_kassa1', { amount: 200000, terminalId: k1.id });
+    expect(v.terminalId).toBe(k1.id);
+    const row = (await (await api('tv_admin', `/vouchers?q=${v.id}`)).json()).items.find((i: any) => i.id === v.id);
+    expect(row.terminal).toMatchObject({ id: k1.id, name: 'tv_Kassa 1' });
+
+    // QR chiqargan qurilma o'chirilmaydi — faolsizlanadi
+    expect(await (await api('tv_admin', `/terminals/${k1.id}`, { method: 'DELETE' })).json()).toMatchObject({ archived: true });
+    expect(await (await api('tv_admin', `/terminals/${le.id}`, { method: 'DELETE' })).json()).toMatchObject({ archived: false });
+  });
+
+  it('holat: kassa ekrani skanerlanishini kutadi', async () => {
+    const v = await issue('tv_kassa1', { amount: 200000 });
+    expect(await (await api('tv_kassa1', `/vouchers/${v.id}/status`)).json()).toMatchObject({ status: 'ISSUED' });
+    expect((await api('tv_kassa2', `/vouchers/${v.id}/status`)).status).toBe(403);
+    await t.send(textMessage(tg(2), `/start v_${await tokenOf(v.id)}`));
+    expect(await (await api('tv_kassa1', `/vouchers/${v.id}/status`)).json()).toMatchObject({ status: 'REDEEMED' });
+  });
+
+  it('filial menejeri: o\'z filialidagi vaucherlarni ko\'radi va bekor qiladi, boshqasinikini emas', async () => {
+    const own = await issue('tv_kassa1', { amount: 200000 });
+    const other = await issue('tv_kassa2', { amount: 200000 });
+    const list = await (await api('tv_manager', '/vouchers?pageSize=200')).json();
+    expect(list.items.length).toBeGreaterThan(0);
+    expect(list.items.every((i: any) => i.branch.id === fazoId)).toBe(true);
+    // ?branchId bilan boshqa filialga o'tib bo'lmaydi
+    const sneaky = await (await api('tv_manager', `/vouchers?branchId=${leFazoId}`)).json();
+    expect(sneaky.items.every((i: any) => i.branch.id === fazoId)).toBe(true);
+    expect((await api('tv_manager', `/vouchers/${other.id}/cancel`, { method: 'POST', json: { reason: 'test' } })).status).toBe(403);
+    expect((await api('tv_manager', `/vouchers/${own.id}/cancel`, { method: 'POST', json: { reason: 'test' } })).status).toBe(200);
+    // Kassir boshqa kassirnikini bekor qila olmaydi
+    expect((await api('tv_kassa2', `/vouchers/${own.id}/reprint`, { method: 'POST' })).status).toBe(403);
+    expect((await api('tv_manager', '/receipts')).status).toBe(403);
+  });
+
+  describe('foydalanuvchilar (RBAC)', () => {
+    const login = `tv_new_${RUN}`;
+    let id: number;
+
+    it('rol shabloni, filial majburiyligi, ruxsatlarni alohida o\'zgartirish', async () => {
+      const bad = await api('tv_admin', '/users', { method: 'POST', json: { login, password: PW, role: 'MANAGER' } });
+      expect(bad.status).toBe(400);
+      const u = await (await api('tv_admin', '/users', { method: 'POST', json: { login, password: PW, role: 'MANAGER', branchId: fazoId } })).json();
+      id = u.id;
+      expect(u).toMatchObject({ role: 'MANAGER', branchId: fazoId, permissions: ['cashier', 'vouchers', 'vouchers.cancel'] });
+
+      const upd = await api('tv_admin', `/users/${id}`, { method: 'PATCH', json: { permissions: ['cashier', 'dashboard', 'nimadir'] } });
+      expect(upd.status).toBe(400); // noma'lum ruxsat
+      const ok = await (await api('tv_admin', `/users/${id}`, { method: 'PATCH', json: { permissions: ['cashier', 'dashboard'] } })).json();
+      expect(ok.permissions).toEqual(['cashier', 'dashboard']);
+      // Rol almashsa — yangi shablon; ADMIN'da filial yo'q
+      const op = await (await api('tv_admin', `/users/${id}`, { method: 'PATCH', json: { role: 'OPERATOR' } })).json();
+      expect(op.permissions).toEqual([...ROLE_TEMPLATES.OPERATOR]);
+
+      const list = await (await api('tv_admin', '/users')).json();
+      expect(list.find((x: any) => x.login === `tv_admin_${RUN}`)).toMatchObject({ permissions: expect.arrayContaining(['users', 'settings']) });
+      expect(list.find((x: any) => x.login === `tv_admin_${RUN}`).lastLoginAt).not.toBeNull();
+    });
+
+    it('o\'zini qulflay olmaydi; ruxsatsiz — 403; o\'chirilgan foydalanuvchi kira olmaydi', async () => {
+      const me = (await (await api('tv_admin', '/auth/me')).json()).id;
+      expect((await api('tv_admin', `/users/${me}`, { method: 'PATCH', json: { isActive: false } })).status).toBe(400);
+      expect((await api('tv_admin', `/users/${me}`, { method: 'PATCH', json: { role: 'OPERATOR' } })).status).toBe(400);
+      expect((await api('tv_manager', '/users')).status).toBe(403);
+      expect((await api('tv_op', '/users')).status).toBe(403);
+      await api('tv_admin', `/users/${id}`, { method: 'PATCH', json: { isActive: false } });
+      const res = await fetch(`${t.baseUrl}/admin/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ login, password: PW }),
+      });
+      expect(res.status).toBe(401);
+    });
   });
 });

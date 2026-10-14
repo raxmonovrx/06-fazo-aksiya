@@ -25,7 +25,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { parseDateTime } from '../reconcile/excel.js';
 import { ReconcileService } from '../reconcile/reconcile.service.js';
 import { BOT } from '../telegram/bot.token.js';
-import { AdminGuard, CurrentAdmin } from './auth.js';
+import { AdminGuard, CurrentAdmin, Perm } from './auth.js';
 import { AuditService } from './audit.service.js';
 import { parse } from './zod.js';
 
@@ -73,6 +73,7 @@ function parseAdminDate(s: string): Date | null {
 
 @Controller('admin')
 @UseGuards(AdminGuard)
+@Perm('receipts', 'moderation')
 export class ReceiptsAdminController {
   constructor(
     private readonly prisma: PrismaService,

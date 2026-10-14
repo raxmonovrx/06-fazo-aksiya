@@ -9,6 +9,7 @@ import { ImportController } from './import.controller.js';
 import { ParticipantsController } from './participants.controller.js';
 import { ReceiptsAdminController } from './receipts-admin.controller.js';
 import { SettingsController } from './settings.controller.js';
+import { TerminalsController } from './terminals.controller.js';
 
 @Global()
 @Module({
@@ -20,6 +21,7 @@ import { SettingsController } from './settings.controller.js';
     ImportController,
     ExportController,
     SettingsController,
+    TerminalsController,
   ],
   providers: [AdminGuard, AuditService],
   exports: [AdminGuard, AuditService],

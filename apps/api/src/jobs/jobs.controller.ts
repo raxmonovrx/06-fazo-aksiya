@@ -1,14 +1,14 @@
 import { Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
 import type { AdminUser } from '@prisma/client';
 
-import { AdminGuard, CurrentAdmin, Roles } from '../admin/auth.js';
+import { AdminGuard, CurrentAdmin } from '../admin/auth.js';
 import { AuditService } from '../admin/audit.service.js';
 import { JobsService } from './jobs.service.js';
 
 /** Cron ishlarini qo'lda ishga tushirish (tekshirish uchun). */
 @Controller('admin/jobs')
 @UseGuards(AdminGuard)
-@Roles('ADMIN')
+// Perm berilmagan — faqat ADMIN
 export class JobsController {
   constructor(
     private readonly jobs: JobsService,

@@ -5,14 +5,14 @@ import type { Response } from 'express';
 
 import { formatTashkent } from '../core/time.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { AdminGuard, CurrentAdmin, Roles } from './auth.js';
+import { AdminGuard, CurrentAdmin, Perm } from './auth.js';
 import { AuditService } from './audit.service.js';
 
 const dt = (d: Date | null | undefined) => (d ? formatTashkent(d) : '');
 
 @Controller('admin/export')
 @UseGuards(AdminGuard)
-@Roles('ADMIN')
+@Perm('export')
 export class ExportController {
   constructor(
     private readonly prisma: PrismaService,

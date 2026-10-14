@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import ExcelJS from 'exceljs';
 import { PrismaClient } from '@prisma/client';
 
+import { ROLE_TEMPLATES } from '../src/admin/permissions.js';
 import { ReceiptsService } from '../src/receipts/receipts.service.js';
 import { createTestApp } from './helpers.js';
 
@@ -67,7 +68,7 @@ describe('Admin panel API + solishtirish', () => {
     await cleanup();
     const hash = await bcrypt.hash('parol12345', 4);
     await prisma.adminUser.create({ data: { login: ADMIN_LOGIN, passwordHash: hash, role: 'ADMIN' } });
-    await prisma.adminUser.create({ data: { login: OP_LOGIN, passwordHash: hash, role: 'OPERATOR' } });
+    await prisma.adminUser.create({ data: { login: OP_LOGIN, passwordHash: hash, role: 'OPERATOR', permissions: [...ROLE_TEMPLATES.OPERATOR] } });
     for (const n of [1, 2, 3]) {
       await prisma.participant.create({
         data: {

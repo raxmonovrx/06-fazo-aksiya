@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { Prisma, type AdminUser, type Participant, type Voucher } from '@prisma/client';
 import QRCode from 'qrcode';
 
+import { can } from '../admin/permissions.js';
 import { esc } from '../bot/texts.js';
 import { CampaignService } from '../campaign/campaign.service.js';
 import { config } from '../config.js';
@@ -35,6 +36,7 @@ export interface RedeemResult {
 export interface IssueInput {
   amount: number;
   branchId?: number;
+  terminalId?: number;
   customerName?: string;
   customerPhone?: string;
 }
@@ -56,13 +58,18 @@ export class VouchersService {
   // ── Chiqarish (kassir) ─────────────────────────────────────────────────
 
   async issue(actor: AdminUser, input: IssueInput) {
-    const branchId = actor.role === 'CASHIER' ? actor.branchId : input.branchId;
+    // Filialga biriktirilgan xodim faqat o'z filialida chiqaradi
+    const branchId = actor.branchId ?? input.branchId;
     if (!branchId) {
-      throw new BadRequestException(actor.role === 'CASHIER' ? 'Kassirga filial biriktirilmagan — adminga murojaat qiling' : 'Filialni tanlang');
+      throw new BadRequestException(actor.role === 'ADMIN' ? 'Filialni tanlang' : 'Sizga filial biriktirilmagan — adminga murojaat qiling');
     }
     const branch = await this.prisma.branch.findUnique({ where: { id: branchId } });
     if (!branch) throw new BadRequestException('Filial topilmadi');
     if (!branch.isActive) throw new BadRequestException('Bu filial aksiyada qatnashmaydi');
+    const terminal = input.terminalId ? await this.prisma.terminal.findUnique({ where: { id: input.terminalId } }) : null;
+    if (input.terminalId && (!terminal || terminal.branchId !== branch.id || !terminal.isActive)) {
+      throw new BadRequestException('Kassa qurilmasi topilmadi — sahifani yangilang');
+    }
 
     const campaign = await this.campaigns.getActive();
     const now = new Date();
@@ -94,6 +101,7 @@ export class VouchersService {
           customerName: input.customerName?.trim() || null,
           customerPhone,
           issuedById: actor.id,
+          terminalId: terminal?.id ?? null,
           expiresAt,
         },
       });
@@ -103,7 +111,7 @@ export class VouchersService {
           action: 'voucher.issue',
           entity: 'voucher',
           entityId: String(v.id),
-          data: { amount: input.amount, couponsCount, branchId: branch.id, customerPhone, customerName: v.customerName },
+          data: { amount: input.amount, couponsCount, branchId: branch.id, terminalId: v.terminalId, customerPhone, customerName: v.customerName },
         },
       });
       return v;
@@ -121,6 +129,7 @@ export class VouchersService {
       couponsCount: v.couponsCount,
       branchId: v.branchId,
       branchName,
+      terminalId: v.terminalId,
       customerName: v.customerName,
       customerPhone: v.customerPhone,
       issuedAt: v.issuedAt,
@@ -133,7 +142,7 @@ export class VouchersService {
   async reprint(actor: AdminUser, id: number) {
     const v = await this.prisma.voucher.findUnique({ where: { id }, include: { branch: true } });
     if (!v) throw new NotFoundException();
-    this.assertCashierOwns(actor, v);
+    this.assertCanManage(actor, v);
     if (v.status !== 'ISSUED') throw new ConflictException('Faqat ishlatilmagan vaucherni qayta chop etish mumkin');
     await this.prisma.auditLog.create({ data: { actorId: actor.id, action: 'voucher.reprint', entity: 'voucher', entityId: String(id) } });
     return this.present(v, v.branch.name, true);
@@ -142,7 +151,7 @@ export class VouchersService {
   async cancel(actor: AdminUser, id: number, reason: string) {
     const v = await this.prisma.voucher.findUnique({ where: { id } });
     if (!v) throw new NotFoundException();
-    this.assertCashierOwns(actor, v);
+    this.assertCanManage(actor, v);
     const upd = await this.prisma.voucher.updateMany({
       where: { id, status: 'ISSUED' },
       data: { status: 'CANCELLED', cancelledById: actor.id, cancelledAt: new Date(), cancelReason: reason },
@@ -152,9 +161,23 @@ export class VouchersService {
     return { ok: true };
   }
 
-  /** Kassir faqat o'zi chiqargan vaucherlar bilan ishlaydi. */
-  private assertCashierOwns(actor: AdminUser, v: Pick<Voucher, 'issuedById'>) {
-    if (actor.role === 'CASHIER' && v.issuedById !== actor.id) throw new ForbiddenException();
+  /**
+   * O'zi chiqarganini har doim; boshqalarnikini — `vouchers.cancel` ruxsati bilan
+   * (filialga biriktirilgan bo'lsa — faqat o'z filialida).
+   */
+  private assertCanManage(actor: AdminUser, v: Pick<Voucher, 'issuedById' | 'branchId'>) {
+    if (v.issuedById === actor.id) return;
+    if (!can(actor, 'vouchers.cancel')) throw new ForbiddenException();
+    if (actor.branchId && v.branchId !== actor.branchId) throw new ForbiddenException();
+  }
+
+  /** Kassa ekrani skanerlanishini kutadi */
+  async status(actor: AdminUser, id: number) {
+    const v = await this.prisma.voucher.findUnique({ where: { id }, select: { id: true, status: true, issuedById: true, branchId: true, expiresAt: true, redeemedAt: true } });
+    if (!v) throw new NotFoundException();
+    if (v.issuedById !== actor.id && !can(actor, 'vouchers')) throw new ForbiddenException();
+    if (actor.branchId && v.branchId !== actor.branchId) throw new ForbiddenException();
+    return { id: v.id, status: v.status, expiresAt: v.expiresAt, redeemedAt: v.redeemedAt };
   }
 
   // ── Skanerlash (mijoz) ─────────────────────────────────────────────────
@@ -274,13 +297,15 @@ export class VouchersService {
     q: { status?: string; branchId?: number; issuedById?: number; from?: Date; to?: Date; q?: string; flagged?: boolean; page: number; pageSize: number },
   ) {
     const where: Prisma.VoucherWhereInput = {};
-    if (actor.role === 'CASHIER') where.issuedById = actor.id;
+    // `vouchers` ruxsatisiz — faqat o'zi chiqarganlar; filialga biriktirilgan — faqat o'z filiali
+    if (!can(actor, 'vouchers')) where.issuedById = actor.id;
     else if (q.issuedById) where.issuedById = q.issuedById;
+    if (actor.branchId) where.branchId = actor.branchId;
     if (q.status) {
       const list = q.status.split(',').filter((s): s is 'ISSUED' | 'REDEEMED' | 'CANCELLED' => ['ISSUED', 'REDEEMED', 'CANCELLED'].includes(s));
       if (list.length) where.status = { in: list };
     }
-    if (q.branchId) where.branchId = q.branchId;
+    if (q.branchId && !actor.branchId) where.branchId = q.branchId;
     if (q.from || q.to) where.issuedAt = { ...(q.from && { gte: q.from }), ...(q.to && { lte: q.to }) };
     if (q.flagged) where.OR = [{ phoneMismatch: true }, { redeemedByStaff: true }];
     if (q.q?.trim()) {
@@ -301,6 +326,7 @@ export class VouchersService {
         take: q.pageSize,
         include: {
           branch: { select: { id: true, name: true } },
+          terminal: { select: { id: true, name: true } },
           issuedBy: { select: { id: true, login: true } },
           cancelledBy: { select: { id: true, login: true } },
           redeemedBy: { select: { id: true, phone: true, firstName: true, lastName: true } },

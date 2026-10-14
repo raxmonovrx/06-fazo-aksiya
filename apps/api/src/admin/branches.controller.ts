@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { normalizeFm } from '../core/receipt-qr.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ReconcileService } from '../reconcile/reconcile.service.js';
-import { AdminGuard, CurrentAdmin, Roles } from './auth.js';
+import { AdminGuard, AnyStaff, CurrentAdmin, Perm } from './auth.js';
 import { AuditService } from './audit.service.js';
 import { parse } from './zod.js';
 
@@ -28,7 +28,7 @@ const deviceSchema = z.object({
 
 @Controller('admin')
 @UseGuards(AdminGuard)
-@Roles('ADMIN')
+@Perm('branches')
 export class BranchesController {
   constructor(
     private readonly prisma: PrismaService,
@@ -37,9 +37,16 @@ export class BranchesController {
   ) {}
 
   @Get('branches')
-  @Roles('ADMIN', 'OPERATOR')
+  // Filtrlar va kassa uchun hamma xodimga kerak
+  @AnyStaff()
   list() {
-    return this.prisma.branch.findMany({ orderBy: { id: 'asc' }, include: { devices: { orderBy: { id: 'asc' } } } });
+    return this.prisma.branch.findMany({
+      orderBy: { id: 'asc' },
+      include: {
+        devices: { orderBy: { id: 'asc' } },
+        terminals: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
+      },
+    });
   }
 
   @Post('branches')
@@ -104,7 +111,7 @@ export class BranchesController {
   }
 
   @Get('unknown-fms')
-  @Roles('ADMIN', 'OPERATOR')
+  @Perm('branches', 'moderation')
   unknownFms() {
     return this.prisma.unknownFm.findMany({ orderBy: { lastSeen: 'desc' } });
   }

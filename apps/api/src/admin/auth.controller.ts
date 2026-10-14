@@ -7,8 +7,9 @@ import { z } from 'zod';
 import { isHttps } from '../config.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RateLimiter } from '../receipts/rate-limiter.js';
-import { ADMIN_COOKIE, AdminGuard, CurrentAdmin, Roles, SESSION_HOURS, signAdminToken } from './auth.js';
+import { ADMIN_COOKIE, AdminGuard, AnyStaff, CurrentAdmin, SESSION_HOURS, signAdminToken } from './auth.js';
 import { AuditService } from './audit.service.js';
+import { permissionsOf } from './permissions.js';
 import { parse } from './zod.js';
 
 const loginSchema = z.object({ login: z.string().min(1).max(64), password: z.string().min(1).max(200) });
@@ -51,7 +52,7 @@ export class AdminAuthController {
 
   @Get('me')
   @UseGuards(AdminGuard)
-  @Roles('ADMIN', 'OPERATOR', 'CASHIER')
+  @AnyStaff()
   async me(@CurrentAdmin() admin: AdminUser) {
     const branch = admin.branchId
       ? await this.prisma.branch.findUnique({
@@ -63,6 +64,7 @@ export class AdminAuthController {
       id: admin.id,
       login: admin.login,
       role: admin.role,
+      permissions: permissionsOf(admin),
       // Kassa sahifasi kupon sonini oldindan ko'rsatishi uchun filial qoidasi bilan
       branch: branch && { ...branch, minSum: Number(branch.minSum), couponPrice: Number(branch.couponPrice) },
     };

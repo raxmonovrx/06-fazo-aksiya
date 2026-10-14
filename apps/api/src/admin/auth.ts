@@ -14,6 +14,7 @@ import jwt from 'jsonwebtoken';
 
 import { config } from '../config.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { can, type Permission } from './permissions.js';
 
 export const ADMIN_COOKIE = 'fc_admin';
 export const SESSION_HOURS = 12;
@@ -32,10 +33,15 @@ export function signAdminToken(user: Pick<AdminUser, 'id' | 'role'>) {
   });
 }
 
-const ROLES_KEY = 'adminRoles';
-const DEFAULT_ROLES: AdminRole[] = ['ADMIN', 'OPERATOR'];
-/** Faqat ko'rsatilgan rollar. Berilmasa — ADMIN va OPERATOR (CASHIER emas). */
-export const Roles = (...roles: AdminRole[]) => SetMetadata(ROLES_KEY, roles);
+const PERMS_KEY = 'adminPerms';
+const ANY = '*';
+/**
+ * Ruxsatlardan kamida bittasi kerak. Endpoint'da ham, controller'da ham
+ * bo'lmasa — faqat ADMIN (yangi endpoint tasodifan ochilib qolmasin).
+ */
+export const Perm = (...perms: Permission[]) => SetMetadata(PERMS_KEY, perms);
+/** Har qanday kirgan xodim (masalan /auth/me, filiallar ro'yxati) */
+export const AnyStaff = () => SetMetadata(PERMS_KEY, [ANY]);
 
 export const CurrentAdmin = createParamDecorator((_: unknown, ctx: ExecutionContext) => {
   return ctx.switchToHttp().getRequest<AdminRequest>().admin;
@@ -61,14 +67,14 @@ export class AdminGuard implements CanActivate {
     const user = await this.prisma.adminUser.findUnique({ where: { id: Number(claims.sub) } });
     if (!user?.isActive) throw new UnauthorizedException();
 
-    const roles = this.reflector.getAllAndOverride<AdminRole[] | undefined>(ROLES_KEY, [
+    const perms = this.reflector.getAllAndOverride<string[] | undefined>(PERMS_KEY, [
       ctx.getHandler(),
       ctx.getClass(),
     ]);
-    // @Roles berilmagan endpoint'lar — ADMIN va OPERATOR uchun. CASHIER faqat
-    // aniq ruxsat berilgan joylarga (vaucherlar) kiradi.
-    const allowed = roles?.length ? roles : DEFAULT_ROLES;
-    if (!allowed.includes(user.role)) throw new ForbiddenException();
+    const ok = perms?.length
+      ? perms.includes(ANY) || perms.some((p) => can(user, p as Permission))
+      : user.role === 'ADMIN';
+    if (!ok) throw new ForbiddenException();
     req.admin = user;
     return true;
   }

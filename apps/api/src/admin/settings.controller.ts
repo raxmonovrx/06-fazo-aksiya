@@ -1,13 +1,14 @@
-import { BadRequestException, Body, ConflictException, Controller, Get, NotFoundException, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
-import { Prisma, type AdminUser } from '@prisma/client';
+import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, NotFoundException, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Prisma, type AdminRole, type AdminUser } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
 import { CampaignService } from '../campaign/campaign.service.js';
 import { tashkentDayStart } from '../core/time.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { AdminGuard, CurrentAdmin, Roles } from './auth.js';
+import { AdminGuard, CurrentAdmin, Perm } from './auth.js';
 import { AuditService } from './audit.service.js';
+import { BRANCH_ROLES, PERMISSIONS, permissionsOf, ROLE_TEMPLATES, type Permission } from './permissions.js';
 import { parse } from './zod.js';
 
 const campaignSchema = z.object({
@@ -17,21 +18,43 @@ const campaignSchema = z.object({
   receiptWindowHours: z.coerce.number().int().min(1).max(24 * 30).optional(),
   rulesText: z.string().max(20_000).optional(),
 });
-const roleSchema = z.enum(['ADMIN', 'OPERATOR', 'CASHIER']);
-const userSchema = z
-  .object({
-    login: z.string().trim().min(3).max(32).regex(/^[a-z0-9._-]+$/i),
-    password: z.string().min(8).max(200),
-    role: roleSchema,
-    branchId: z.number().int().nullable().optional(),
-  })
-  .refine((u) => u.role !== 'CASHIER' || u.branchId, { message: 'Kassir uchun filialni tanlang', path: ['branchId'] });
+const roleSchema = z.enum(['ADMIN', 'OPERATOR', 'MANAGER', 'CASHIER']);
+const permsSchema = z.array(z.enum(PERMISSIONS)).max(PERMISSIONS.length);
+const userSchema = z.object({
+  login: z.string().trim().min(3).max(32).regex(/^[a-z0-9._-]+$/i),
+  password: z.string().min(8).max(200),
+  role: roleSchema,
+  // Berilmasa — rol shabloni
+  permissions: permsSchema.optional(),
+  branchId: z.number().int().nullable().optional(),
+});
 const userPatchSchema = z.object({
   password: z.string().min(8).max(200).optional(),
   role: roleSchema.optional(),
+  permissions: permsSchema.optional(),
   branchId: z.number().int().nullable().optional(),
   isActive: z.boolean().optional(),
 });
+const USER_SELECT = {
+  id: true,
+  login: true,
+  role: true,
+  permissions: true,
+  isActive: true,
+  createdAt: true,
+  branchId: true,
+  branch: { select: { id: true, name: true } },
+} satisfies Prisma.AdminUserSelect;
+
+/** Rol, filial va ruxsatlar birga to'g'rimi — saqlanadigan qiymatlarni qaytaradi */
+function normalizeAccess(role: AdminRole, branchId: number | null | undefined, permissions: readonly Permission[] | undefined) {
+  if (BRANCH_ROLES.includes(role) && !branchId) throw new BadRequestException('Bu rol uchun filialni tanlang');
+  return {
+    // ADMIN hamma filialni ko'radi — filial cheklovi yo'q
+    branchId: role === 'ADMIN' ? null : (branchId ?? null),
+    permissions: role === 'ADMIN' ? [] : [...new Set(permissions ?? ROLE_TEMPLATES[role])],
+  };
+}
 
 @Controller('admin')
 @UseGuards(AdminGuard)
@@ -43,6 +66,7 @@ export class SettingsController {
   ) {}
 
   @Get('dashboard')
+  @Perm('dashboard')
   async dashboard() {
     const todayStart = tashkentDayStart(new Date());
     const [participantsTotal, participantsToday, staff, byStatus, couponsEligible, couponsToday, branches, perBranch] =
@@ -77,6 +101,7 @@ export class SettingsController {
   }
 
   @Get('settings/campaign')
+  @Perm('dashboard', 'settings')
   async getCampaign() {
     const c = await this.prisma.campaign.findFirst({ where: { isActive: true }, orderBy: { id: 'asc' } });
     if (!c) throw new NotFoundException();
@@ -84,7 +109,7 @@ export class SettingsController {
   }
 
   @Patch('settings/campaign')
-  @Roles('ADMIN')
+  @Perm('settings')
   async patchCampaign(@Body() body: unknown, @CurrentAdmin() admin: AdminUser) {
     const data = parse(campaignSchema, body);
     const c = await this.prisma.campaign.findFirst({ where: { isActive: true }, orderBy: { id: 'asc' } });
@@ -97,29 +122,32 @@ export class SettingsController {
   }
 
   @Get('users')
-  @Roles('ADMIN')
-  users() {
-    return this.prisma.adminUser.findMany({
-      select: { id: true, login: true, role: true, isActive: true, createdAt: true, branchId: true, branch: { select: { id: true, name: true } } },
-      orderBy: { id: 'asc' },
-    });
+  @Perm('users')
+  async users() {
+    const [users, logins] = await Promise.all([
+      this.prisma.adminUser.findMany({ select: USER_SELECT, orderBy: { id: 'asc' } }),
+      this.prisma.auditLog.groupBy({ by: ['actorId'], where: { action: 'auth.login' }, _max: { createdAt: true } }),
+    ]);
+    return users.map((u) => ({
+      ...u,
+      permissions: permissionsOf(u),
+      lastLoginAt: logins.find((l) => l.actorId === u.id)?._max.createdAt ?? null,
+    }));
   }
 
   @Post('users')
-  @Roles('ADMIN')
+  @Perm('users')
   async createUser(@Body() body: unknown, @CurrentAdmin() admin: AdminUser) {
     const data = parse(userSchema, body);
+    if (data.role === 'ADMIN' && admin.role !== 'ADMIN') throw new ForbiddenException();
+    const access = normalizeAccess(data.role, data.branchId, data.permissions);
     try {
       const u = await this.prisma.adminUser.create({
-        data: {
-          login: data.login,
-          role: data.role,
-          branchId: data.role === 'CASHIER' ? data.branchId : (data.branchId ?? null),
-          passwordHash: await bcrypt.hash(data.password, 12),
-        },
+        data: { login: data.login, role: data.role, ...access, passwordHash: await bcrypt.hash(data.password, 12) },
+        select: USER_SELECT,
       });
-      await this.audit.log(admin.id, 'admin.create', 'admin', u.id, { login: u.login, role: u.role, branchId: u.branchId });
-      return { id: u.id, login: u.login, role: u.role, branchId: u.branchId };
+      await this.audit.log(admin.id, 'admin.create', 'admin', u.id, { login: u.login, role: u.role, ...access });
+      return { ...u, permissions: permissionsOf(u) };
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw new ConflictException('Bu login band');
       throw e;
@@ -127,26 +155,38 @@ export class SettingsController {
   }
 
   @Patch('users/:id')
-  @Roles('ADMIN')
+  @Perm('users')
   async patchUser(@Param('id', ParseIntPipe) id: number, @Body() body: unknown, @CurrentAdmin() admin: AdminUser) {
     const data = parse(userPatchSchema, body);
-    if (id === admin.id && (data.isActive === false || data.role === 'OPERATOR')) {
-      throw new BadRequestException("O'zingizni o'chira yoki pasaytira olmaysiz");
+    const accessChange = data.role !== undefined || data.permissions !== undefined || data.branchId !== undefined;
+    // O'zini qulflab qo'ymasin: o'z rolini, ruxsatini va holatini o'zgartira olmaydi (parol — mumkin)
+    if (id === admin.id && (accessChange || data.isActive !== undefined)) {
+      throw new BadRequestException("O'zingizning rolingiz va ruxsatlaringizni o'zgartira olmaysiz");
     }
-    const u = await this.prisma.adminUser
-      .update({
-        where: { id },
-        data: {
-          role: data.role,
-          branchId: data.branchId,
-          isActive: data.isActive,
-          ...(data.password && { passwordHash: await bcrypt.hash(data.password, 12) }),
-        },
-      })
-      .catch(() => null);
-    if (!u) throw new NotFoundException();
+    const before = await this.prisma.adminUser.findUnique({ where: { id } });
+    if (!before) throw new NotFoundException();
+    // ADMIN'ga faqat ADMIN tegadi
+    if (admin.role !== 'ADMIN' && (before.role === 'ADMIN' || data.role === 'ADMIN')) throw new ForbiddenException();
+    const role = data.role ?? before.role;
+    const access = accessChange
+      ? normalizeAccess(
+          role,
+          data.branchId !== undefined ? data.branchId : before.branchId,
+          // Rol almashib, ruxsatlar berilmasa — yangi rol shabloni
+          data.permissions ?? (role !== before.role ? undefined : permissionsOf(before)),
+        )
+      : {};
+    const u = await this.prisma.adminUser.update({
+      where: { id },
+      data: {
+        role: data.role,
+        ...access,
+        isActive: data.isActive,
+        ...(data.password && { passwordHash: await bcrypt.hash(data.password, 12) }),
+      },
+      select: USER_SELECT,
+    });
     await this.audit.log(admin.id, 'admin.update', 'admin', id, { ...data, password: data.password ? '***' : undefined });
-    if (u.role === 'CASHIER' && !u.branchId) throw new BadRequestException('Kassir uchun filialni tanlang');
-    return { id: u.id, login: u.login, role: u.role, isActive: u.isActive, branchId: u.branchId };
+    return { ...u, permissions: permissionsOf(u) };
   }
 }

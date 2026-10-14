@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { normalizePhone } from '../core/phone.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { AdminGuard, CurrentAdmin, Roles } from './auth.js';
+import { AdminGuard, CurrentAdmin, Perm } from './auth.js';
 import { AuditService } from './audit.service.js';
 import { parse } from './zod.js';
 
@@ -21,6 +21,7 @@ const staffImportSchema = z.object({ text: z.string().max(2_000_000), replace: z
 
 @Controller('admin')
 @UseGuards(AdminGuard)
+@Perm('participants')
 export class ParticipantsController {
   constructor(
     private readonly prisma: PrismaService,
@@ -79,7 +80,7 @@ export class ParticipantsController {
   }
 
   @Patch('participants/:id')
-  @Roles('ADMIN')
+  @Perm('participants.edit')
   async patch(@Param('id', ParseIntPipe) id: number, @Body() body: unknown, @CurrentAdmin() admin: AdminUser) {
     const data = parse(patchSchema, body);
     const p = await this.prisma.participant.update({ where: { id }, data }).catch(() => null);
@@ -92,7 +93,7 @@ export class ParticipantsController {
   // ── Xodimlar ───────────────────────────────────────────────────────────
 
   @Get('staff')
-  @Roles('ADMIN')
+  @Perm('staff')
   staff() {
     return this.prisma.staffPhone.findMany({ orderBy: { createdAt: 'desc' } });
   }
@@ -102,7 +103,7 @@ export class ParticipantsController {
    * `replace` — ro'yxatni to'liq almashtirish.
    */
   @Post('staff/import')
-  @Roles('ADMIN')
+  @Perm('staff')
   async importStaff(@Body() body: unknown, @CurrentAdmin() admin: AdminUser) {
     const { text, replace } = parse(staffImportSchema, body);
     const rows = new Map<string, string | null>();
@@ -132,7 +133,7 @@ export class ParticipantsController {
   }
 
   @Delete('staff/:phone')
-  @Roles('ADMIN')
+  @Perm('staff')
   async removeStaff(@Param('phone') phone: string, @CurrentAdmin() admin: AdminUser) {
     const p = normalizePhone(phone);
     if (!p) throw new BadRequestException();

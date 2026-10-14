@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ImportService } from '../reconcile/import.service.js';
 import { ReconcileService } from '../reconcile/reconcile.service.js';
-import { AdminGuard, CurrentAdmin, Roles } from './auth.js';
+import { AdminGuard, CurrentAdmin, Perm } from './auth.js';
 import { AuditService } from './audit.service.js';
 import { parse } from './zod.js';
 
@@ -21,7 +21,7 @@ const commitSchema = z.object({
 
 @Controller('admin')
 @UseGuards(AdminGuard)
-@Roles('ADMIN')
+@Perm('import')
 export class ImportController {
   constructor(
     private readonly imports: ImportService,

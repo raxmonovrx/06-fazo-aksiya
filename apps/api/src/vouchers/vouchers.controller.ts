@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, Post, Query, UseG
 import type { AdminUser } from '@prisma/client';
 import { z } from 'zod';
 
-import { AdminGuard, CurrentAdmin, Roles } from '../admin/auth.js';
+import { AdminGuard, CurrentAdmin, Perm } from '../admin/auth.js';
 import { parse } from '../admin/zod.js';
 import { parseDateTime } from '../reconcile/excel.js';
 import { VouchersService } from './vouchers.service.js';
@@ -10,6 +10,7 @@ import { VouchersService } from './vouchers.service.js';
 const issueSchema = z.object({
   amount: z.coerce.number().positive().max(1_000_000_000),
   branchId: z.coerce.number().int().optional(),
+  terminalId: z.coerce.number().int().optional(),
   customerName: z.string().trim().max(100).optional(),
   customerPhone: z.string().trim().max(30).optional(),
 });
@@ -39,28 +40,34 @@ export class VouchersController {
   constructor(private readonly vouchers: VouchersService) {}
 
   @Post()
-  @Roles('ADMIN', 'CASHIER')
+  @Perm('cashier')
   issue(@Body() body: unknown, @CurrentAdmin() admin: AdminUser) {
     return this.vouchers.issue(admin, parse(issueSchema, body));
   }
 
   @Get()
-  @Roles('ADMIN', 'OPERATOR', 'CASHIER')
+  @Perm('cashier', 'vouchers')
   list(@Query() query: unknown, @CurrentAdmin() admin: AdminUser) {
     const q = parse(listSchema, query);
     return this.vouchers.list(admin, { ...q, from: parseDate(q.from), to: parseDate(q.to), flagged: q.flagged === 'true' });
   }
 
+  @Get(':id/status')
+  @Perm('cashier', 'vouchers')
+  status(@Param('id', ParseIntPipe) id: number, @CurrentAdmin() admin: AdminUser) {
+    return this.vouchers.status(admin, id);
+  }
+
   @Post(':id/reprint')
   @HttpCode(200)
-  @Roles('ADMIN', 'CASHIER')
+  @Perm('cashier', 'vouchers.cancel')
   reprint(@Param('id', ParseIntPipe) id: number, @CurrentAdmin() admin: AdminUser) {
     return this.vouchers.reprint(admin, id);
   }
 
   @Post(':id/cancel')
   @HttpCode(200)
-  @Roles('ADMIN', 'CASHIER')
+  @Perm('cashier', 'vouchers.cancel')
   cancel(@Param('id', ParseIntPipe) id: number, @Body() body: unknown, @CurrentAdmin() admin: AdminUser) {
     return this.vouchers.cancel(admin, id, parse(cancelSchema, body).reason);
   }
