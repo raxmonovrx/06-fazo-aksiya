@@ -1,20 +1,21 @@
 'use client';
 
 import {
-  RiAddLine,
+  RiCheckboxCircleFill,
   RiCloseCircleLine,
+  RiCloseLine,
   RiLoader4Line,
   RiPrinterLine,
   RiQrCodeLine,
+  RiSmartphoneLine,
 } from '@remixicon/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import { ErrorAlert, useLoad } from '@/components/admin/kit';
-import { PageContainer } from '@/components/admin/layout';
+import { useLoad } from '@/components/admin/kit';
+import { noAutofill, PhoneInput, phoneValue } from '@/components/admin/phone-input';
 import { VoucherStatusBadge, type VoucherRow } from '@/components/admin/voucher-status';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -23,28 +24,44 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { adminApi, qs } from '@/lib/api';
 import { fmtPhone, fmtShort, fmtSum } from '@/lib/format';
+import { OUTPUTS, type Terminal, type TerminalOutput } from '@/lib/terminals';
 import { cn } from '@/lib/utils';
-import { printVoucher, type PaperWidth, type PrintableVoucher } from '@/lib/voucher-print';
-import { useAdmin, type AdminBranch } from '../admin-context';
+import { printVoucher, type PrintableVoucher } from '@/lib/voucher-print';
+import { can, useAdmin } from '../admin-context';
 
 interface Issued extends PrintableVoucher {
   link: string;
+  terminalId: number | null;
   customerName: string | null;
   customerPhone: string | null;
 }
+
+interface BranchRow {
+  id: number;
+  name: string;
+  isActive: boolean;
+  minSum: string;
+  couponPrice: string;
+  maxPerReceipt: number;
+  terminals: Terminal[];
+}
+
+/** Terminal qo'shilmagan bo'lsa — oddiy ikki tugma */
+const FALLBACK: Array<Pick<Terminal, 'name' | 'output'> & { id: null; key: string }> = [
+  { id: null, key: 'p', name: 'Chop etish', output: 'PRINT_80' },
+  { id: null, key: 's', name: 'Ekranda', output: 'SCREEN' },
+];
 
 const onlyDigits = (s: string) => s.replace(/\D/g, '');
 const groupDigits = (s: string) => s.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 /** Kupon soni — serverdagi formula bilan bir xil (oldindan ko'rsatish uchun) */
-function couponsFor(sum: number, b: Pick<AdminBranch, 'minSum' | 'couponPrice' | 'maxPerReceipt'> | null) {
+function couponsFor(sum: number, b: { minSum: number; couponPrice: number; maxPerReceipt: number } | null) {
   if (!b || !sum || sum < b.minSum || b.couponPrice <= 0) return 0;
   return Math.min(Math.max(1, Math.floor(sum / b.couponPrice)), b.maxPerReceipt);
 }
@@ -55,105 +72,117 @@ function todayStartIso() {
   return `${ymd}T00:00:00+05:00`;
 }
 
-const readPref = <T,>(key: string, fallback: T): T => {
+const readPref = (key: string) => {
   try {
-    const v = localStorage.getItem(key);
-    return v === null ? fallback : (JSON.parse(v) as T);
+    return localStorage.getItem(key);
   } catch {
-    return fallback;
+    return null;
   }
 };
-const writePref = (key: string, v: unknown) => {
+const writePref = (key: string, v: string) => {
   try {
-    localStorage.setItem(key, JSON.stringify(v));
+    localStorage.setItem(key, v);
   } catch {
     /* saqlanmasa ham ishlayveradi */
   }
 };
 
+const paperOf = (o: TerminalOutput) => (o === 'PRINT_58' ? 58 : 80);
+
 export default function CashierPage() {
   const me = useAdmin();
-  const isCashier = me.role === 'CASHIER';
   const amountRef = useRef<HTMLInputElement>(null);
-  const qrRef = useRef<HTMLDivElement>(null);
+  const seesAll = can(me, 'vouchers');
 
   const [amount, setAmount] = useState('');
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
-  const [branchId, setBranchId] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [pickedBranch, setPickedBranch] = useState('');
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [current, setCurrent] = useState<Issued | null>(null);
-  const [paper, setPaper] = useState<PaperWidth>(80);
-  const [autoPrint, setAutoPrint] = useState(false);
+  const [last, setLast] = useState<Issued | null>(null);
+  const [onScreen, setOnScreen] = useState<Issued | null>(null);
+  const [lastKey, setLastKey] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<VoucherRow | null>(null);
   const [reason, setReason] = useState('');
 
-  useEffect(() => {
-    setPaper(readPref<PaperWidth>('fc.paper', 80));
-    setAutoPrint(readPref('fc.autoPrint', false));
-  }, []);
+  // Qaysi terminal oxirgi marta bosilgan — shu qurilmada eslab qolinadi (Enter shuni bosadi)
+  useEffect(() => setLastKey(readPref('fc.terminal')), []);
 
-  const branches = useLoad(
-    () => (isCashier ? Promise.resolve([] as AdminBranch[]) : adminApi<AdminBranch[]>('/branches')),
-    [isCashier],
+  const branches = useLoad(() => adminApi<BranchRow[]>('/branches'), []);
+  const branchId = me.branch?.id ?? (pickedBranch ? Number(pickedBranch) : null);
+  const branch = branches.data?.find((b) => b.id === branchId) ?? null;
+  const rule = branch && { minSum: Number(branch.minSum), couponPrice: Number(branch.couponPrice), maxPerReceipt: branch.maxPerReceipt };
+  const terminals = useMemo(
+    () =>
+      branch?.terminals.filter((t) => t.isActive).map((t) => ({ ...t, key: String(t.id) })) ??
+      ([] as Array<Terminal & { key: string }>),
+    [branch],
   );
-  const branch: AdminBranch | null = isCashier
-    ? me.branch
-    : (branches.data?.find((b) => String(b.id) === branchId) ?? null);
-  const branchRule = branch && { ...branch, minSum: Number(branch.minSum), couponPrice: Number(branch.couponPrice) };
+  const buttons: Array<{ id: number | null; key: string; name: string; output: TerminalOutput }> = terminals.length
+    ? terminals
+    : FALLBACK;
+  const primaryKey = buttons.some((b) => b.key === lastKey) ? lastKey : buttons[0]?.key;
 
   const today = useLoad(
     () => adminApi<{ items: VoucherRow[] }>(`/vouchers${qs({ from: todayStartIso(), pageSize: 100 })}`),
     [],
   );
+  const todayItems = today.data?.items ?? [];
+  const todayActive = todayItems.filter((v) => v.status !== 'CANCELLED');
 
   const sum = Number(onlyDigits(amount) || 0);
-  const coupons = useMemo(() => couponsFor(sum, branchRule), [sum, branchRule]);
-  const belowMin = Boolean(sum && branchRule && sum < branchRule.minSum);
+  const coupons = couponsFor(sum, rule);
+  const belowMin = Boolean(sum && rule && sum < rule.minSum);
+  const phoneOk = phoneValue(phone) !== undefined;
+  const ready = Boolean(branch && coupons && phoneOk);
 
-  const reset = useCallback(() => {
+  const resetForm = useCallback(() => {
     setAmount('');
     setPhone('');
     setName('');
     setError(null);
-    setCurrent(null);
     setTimeout(() => amountRef.current?.focus(), 0);
   }, []);
 
-  const issue = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!coupons || busy) return;
-    setBusy(true);
+  const output = (v: Issued, out: TerminalOutput) => {
+    if (out === 'SCREEN') setOnScreen(v);
+    else printVoucher(v, paperOf(out));
+  };
+
+  const issue = async (btn: (typeof buttons)[number]) => {
+    if (!ready || busyKey) return;
+    setBusyKey(btn.key);
     setError(null);
     try {
       const v = await adminApi<Issued>('/vouchers', {
         method: 'POST',
         json: {
           amount: sum,
-          ...(!isCashier && { branchId: Number(branchId) }),
-          ...(phone.trim() && { customerPhone: phone }),
-          ...(name.trim() && { customerName: name }),
+          ...(!me.branch && { branchId }),
+          ...(btn.id && { terminalId: btn.id }),
+          ...(phoneValue(phone) && { customerPhone: phoneValue(phone) }),
+          ...(name.trim() && { customerName: name.trim() }),
         },
       });
-      setCurrent(v);
-      toast.success(`QR #${v.id} tayyor — ${v.couponsCount} kupon`);
-      // Telefonda (Sunmi) QR formadan pastda — mijoz skanerlashi uchun ko'rinishga suramiz
-      setTimeout(() => qrRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
-      if (autoPrint) printVoucher(v, paper);
+      setLast(v);
+      setLastKey(btn.key);
+      writePref('fc.terminal', btn.key);
+      output(v, btn.output);
+      toast.success(`QR #${v.id} — ${v.couponsCount} kupon`);
+      resetForm();
       void today.reload();
     } catch (err) {
       setError((err as Error).message);
     } finally {
-      setBusy(false);
+      setBusyKey(null);
     }
   };
 
-  const reprint = async (row: VoucherRow) => {
+  const reprint = async (row: VoucherRow, out: TerminalOutput) => {
     try {
       const v = await adminApi<Issued>(`/vouchers/${row.id}/reprint`, { method: 'POST' });
-      setCurrent(v);
-      printVoucher(v, paper);
+      output(v, out);
     } catch (err) {
       toast.error((err as Error).message);
     }
@@ -164,7 +193,7 @@ export default function CashierPage() {
     try {
       await adminApi(`/vouchers/${cancelling.id}/cancel`, { method: 'POST', json: { reason } });
       toast.success(`QR #${cancelling.id} bekor qilindi`);
-      if (current?.id === cancelling.id) setCurrent(null);
+      if (last?.id === cancelling.id) setLast(null);
       setCancelling(null);
       setReason('');
       void today.reload();
@@ -173,226 +202,262 @@ export default function CashierPage() {
     }
   };
 
-  const setPaperPref = (v: PaperWidth) => {
-    setPaper(v);
-    writePref('fc.paper', v);
-  };
+  // Qayta chop etish: oxirgi bosilgan printer terminali (bo'lmasa 80 mm)
+  const printOut: TerminalOutput =
+    buttons.find((b) => b.key === primaryKey && b.output !== 'SCREEN')?.output ??
+    buttons.find((b) => b.output !== 'SCREEN')?.output ??
+    'PRINT_80';
+
+  const hint = !branch
+    ? me.branch
+      ? ''
+      : 'Avval filialni tanlang'
+    : belowMin
+      ? `Kupon uchun kamida ${fmtSum(rule!.minSum)}`
+      : !phoneOk
+        ? "Raqam to'liq emas: +998 XX XXX XXXX"
+        : !sum
+          ? 'Summani kiriting'
+          : '';
 
   return (
-    <PageContainer>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Yangi QR</CardTitle>
-            <CardDescription>
-              {isCashier
-                ? me.branch
-                  ? `${me.branch.name} · kupon: har ${fmtSum(me.branch.couponPrice)}, kamida ${fmtSum(me.branch.minSum)}`
-                  : "Sizga filial biriktirilmagan — adminga murojaat qiling"
-                : 'Summani kiriting — QR mijoz uchun chiqadi'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={issue}>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="amount">Chek summasi (so&apos;m)</FieldLabel>
-                  <Input
-                    id="amount"
-                    ref={amountRef}
-                    autoFocus
-                    inputMode="numeric"
-                    autoComplete="off"
-                    placeholder="0"
-                    className="h-14 text-3xl font-semibold tabular-nums md:text-3xl"
-                    value={groupDigits(onlyDigits(amount))}
-                    onChange={(e) => setAmount(onlyDigits(e.target.value).slice(0, 10))}
-                  />
-                  <FieldDescription className={cn(belowMin && 'text-destructive')}>
-                    {!branchRule
-                      ? 'Filialni tanlang'
-                      : belowMin
-                        ? `Summa kam — kupon uchun kamida ${fmtSum(branchRule.minSum)}`
-                        : coupons
-                          ? `${coupons} ta kupon beriladi`
-                          : ' '}
-                  </FieldDescription>
-                </Field>
-
-                {!isCashier && (
-                  <Field>
-                    <FieldLabel>Filial</FieldLabel>
-                    <Select
-                      items={(branches.data ?? []).filter((b) => b).map((b) => ({ value: String(b.id), label: b.name }))}
-                      value={branchId || null}
-                      onValueChange={(v) => setBranchId((v as string | null) ?? '')}
-                    >
-                      <SelectTrigger className="h-10! w-full">
-                        <SelectValue placeholder="Filialni tanlang" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(branches.data ?? []).map((b) => (
-                          <SelectItem key={b.id} value={String(b.id)}>
-                            {b.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                )}
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="phone">Mijoz telefoni</FieldLabel>
-                    <Input
-                      id="phone"
-                      inputMode="tel"
-                      autoComplete="off"
-                      placeholder="+998 90 123 45 67"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="name">Ism familiya</FieldLabel>
-                    <Input id="name" autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
-                  </Field>
-                </div>
-
-                <ErrorAlert error={error} />
-
-                <Button type="submit" size="lg" className="h-12 text-base" disabled={busy || !coupons}>
-                  {busy ? <RiLoader4Line className="animate-spin" /> : <RiQrCodeLine />}
-                  QR yaratish
-                </Button>
-              </FieldGroup>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card className="min-h-[420px]" ref={qrRef}>
-          <CardHeader>
-            <CardTitle>QR</CardTitle>
-            <CardDescription>Mijoz telefon kamerasi bilan skanerlaydi — bot ochiladi va kuponlar qo&apos;shiladi</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {current ? (
-              <div className="flex flex-col items-center gap-4 text-center">
-                <div
-                  className="w-full max-w-[300px] rounded-xl bg-white p-3 [&_svg]:h-auto [&_svg]:w-full"
-                  // Server yaratgan SVG (qrcode kutubxonasi) — tashqi kiritma emas
-                  dangerouslySetInnerHTML={{ __html: current.qrSvg }}
-                />
-                <div>
-                  <p className="text-3xl font-bold tabular-nums">{current.couponsCount} kupon</p>
-                  <p className="text-sm text-muted-foreground">
-                    {current.branchName} · {fmtSum(current.amount)} · #{current.id}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Amal qiladi: {fmtShort(current.expiresAt)} gacha · bir martalik</p>
-                </div>
-                <div className="flex flex-wrap justify-center gap-2">
-                  <Button size="lg" onClick={() => printVoucher(current, paper)}>
-                    <RiPrinterLine /> Chop etish
-                  </Button>
-                  <Button size="lg" variant="outline" onClick={reset}>
-                    <RiAddLine /> Yangi QR
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
-                <RiQrCodeLine className="size-10 opacity-40" />
-                Summani kiritib, «QR yaratish»ni bosing
-              </div>
-            )}
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t pt-4 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Printer:</span>
-                {([58, 80] as const).map((w) => (
-                  <Button key={w} size="sm" variant={paper === w ? 'secondary' : 'ghost'} onClick={() => setPaperPref(w)}>
-                    {w} mm
-                  </Button>
+    <div className="mx-auto grid w-full max-w-6xl grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+      {/* ── Chap: forma va terminallar ─────────────────────────────── */}
+      <form
+        autoComplete="off"
+        className="flex min-w-0 flex-col gap-4 rounded-2xl border bg-card p-4 shadow-xs md:p-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const btn = buttons.find((b) => b.key === primaryKey);
+          if (btn) void issue(btn);
+        }}
+      >
+        {!me.branch && (
+          <Field>
+            <FieldLabel>Filial</FieldLabel>
+            <Select
+              items={(branches.data ?? []).map((b) => ({ value: String(b.id), label: b.name }))}
+              value={pickedBranch || null}
+              onValueChange={(v) => setPickedBranch((v as string | null) ?? '')}
+            >
+              <SelectTrigger className="h-12! w-full text-base">
+                <SelectValue placeholder="Filialni tanlang" />
+              </SelectTrigger>
+              <SelectContent>
+                {(branches.data ?? []).map((b) => (
+                  <SelectItem key={b.id} value={String(b.id)}>
+                    {b.name}
+                  </SelectItem>
                 ))}
-              </div>
-              <label className="flex items-center gap-2">
-                <Switch
-                  checked={autoPrint}
-                  onCheckedChange={(v) => {
-                    setAutoPrint(Boolean(v));
-                    writePref('fc.autoPrint', Boolean(v));
-                  }}
-                />
-                Yaratilganda darhol chop etish
-              </label>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              </SelectContent>
+            </Select>
+          </Field>
+        )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Bugungi QR&apos;lar</CardTitle>
-          <CardDescription>{isCashier ? 'Siz chiqargan' : 'Barcha kassalar'} · skanerlanmaganini qayta chop etish yoki bekor qilish mumkin</CardDescription>
-        </CardHeader>
-        <CardContent className="px-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-6">#</TableHead>
-                <TableHead>Vaqt</TableHead>
-                {!isCashier && <TableHead>Kassa</TableHead>}
-                <TableHead className="text-right">Summa</TableHead>
-                <TableHead className="text-right">Kupon</TableHead>
-                <TableHead>Mijoz</TableHead>
-                <TableHead>Holat</TableHead>
-                <TableHead className="pr-6 text-right" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {today.data?.items.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
-                    Bugun hali QR chiqarilmagan
-                  </TableCell>
-                </TableRow>
-              )}
-              {today.data?.items.map((v) => (
-                <TableRow key={v.id}>
-                  <TableCell className="pl-6 text-muted-foreground">#{v.id}</TableCell>
-                  <TableCell className="tabular-nums">{fmtShort(v.issuedAt).split(' ')[1]}</TableCell>
-                  {!isCashier && (
-                    <TableCell>
-                      {v.issuedBy.login}
-                      <div className="text-xs text-muted-foreground">{v.branch.name}</div>
-                    </TableCell>
+        <div>
+          <label htmlFor="c-sum" className="text-sm font-medium text-muted-foreground">
+            Chek summasi
+          </label>
+          <div className="mt-1.5 flex items-baseline gap-3 rounded-2xl border-2 border-input px-4 py-2 transition-colors focus-within:border-primary">
+            <input
+              id="c-sum"
+              ref={amountRef}
+              autoFocus
+              inputMode="numeric"
+              {...noAutofill('s1')}
+              placeholder="0"
+              className="h-16 w-0 min-w-0 flex-1 bg-transparent text-5xl font-bold tabular-nums outline-none placeholder:text-muted-foreground/40 md:h-20 md:text-6xl"
+              value={groupDigits(onlyDigits(amount))}
+              onChange={(e) => setAmount(onlyDigits(e.target.value).slice(0, 10))}
+            />
+            <span className="text-xl font-medium text-muted-foreground">so&apos;m</span>
+          </div>
+          <div className="mt-2 flex min-h-9 items-center gap-3">
+            {coupons ? (
+              <span className="rounded-full bg-emerald-500/15 px-4 py-1.5 text-lg font-semibold text-emerald-700 dark:text-emerald-400">
+                {coupons} ta kupon
+              </span>
+            ) : (
+              <span className={cn('text-sm text-muted-foreground', belowMin && 'font-medium text-destructive')}>
+                {belowMin ? `Kupon uchun kamida ${fmtSum(rule!.minSum)}` : rule ? `Har ${fmtSum(rule.couponPrice)} — 1 kupon` : ''}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label htmlFor="c-p" className="text-sm font-medium text-muted-foreground">
+              Mijoz raqami <span className="font-normal">(ixtiyoriy)</span>
+            </label>
+            <PhoneInput
+              id="c-p"
+              value={phone}
+              onChange={setPhone}
+              invalid={!phoneOk}
+              className="mt-1.5 h-14 rounded-xl text-xl"
+            />
+          </div>
+          <div>
+            <label htmlFor="c-n" className="text-sm font-medium text-muted-foreground">
+              Ismi <span className="font-normal">(ixtiyoriy)</span>
+            </label>
+            <Input
+              id="c-n"
+              {...noAutofill('n1')}
+              className="mt-1.5 h-14 rounded-xl px-3 text-xl md:text-xl"
+              value={name}
+              maxLength={100}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {error && (
+          <p className="rounded-xl bg-destructive/10 px-4 py-3 text-base font-medium text-destructive">{error}</p>
+        )}
+
+        <div>
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <span className="text-sm font-medium text-muted-foreground">
+              {terminals.length ? 'Terminalni bosing' : 'QR chiqarish'}
+            </span>
+            {hint && <span className="text-sm text-muted-foreground">{hint}</span>}
+          </div>
+          <div className={cn('grid gap-3', buttons.length > 1 && 'sm:grid-cols-2')}>
+            {buttons.map((b) => {
+              const Icon = OUTPUTS[b.output].icon;
+              const primary = b.key === primaryKey;
+              return (
+                <Button
+                  key={b.key}
+                  type="button"
+                  variant={primary ? 'default' : 'outline'}
+                  disabled={!ready || busyKey !== null}
+                  onClick={() => void issue(b)}
+                  className="h-20 justify-start gap-4 rounded-2xl px-5 text-left [&_svg:not([class*='size-'])]:size-7"
+                >
+                  {busyKey === b.key ? <RiLoader4Line className="animate-spin" /> : <Icon />}
+                  <span className="grid min-w-0 leading-tight">
+                    <span className="truncate text-xl font-semibold">{b.name}</span>
+                    <span className={cn('truncate text-sm', primary ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+                      {OUTPUTS[b.output].short}
+                      {primary && buttons.length > 1 && ' · Enter'}
+                    </span>
+                  </span>
+                </Button>
+              );
+            })}
+          </div>
+          {!terminals.length && branch && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Bu filialga terminal qo&apos;shilmagan — admin «Filiallar va kassalar» bo&apos;limida qo&apos;shadi.
+            </p>
+          )}
+        </div>
+      </form>
+
+      {/* ── O'ng: oxirgi QR va bugungi ro'yxat ─────────────────────── */}
+      <aside className="flex min-w-0 flex-col gap-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border bg-card p-4">
+            <div className="text-sm text-muted-foreground">Bugun QR</div>
+            <div className="text-3xl font-bold tabular-nums">{todayActive.length}</div>
+          </div>
+          <div className="rounded-2xl border bg-card p-4">
+            <div className="text-sm text-muted-foreground">Kupon</div>
+            <div className="text-3xl font-bold tabular-nums">{todayActive.reduce((n, v) => n + v.couponsCount, 0)}</div>
+          </div>
+        </div>
+
+        {last && (
+          <div className="flex items-center gap-4 rounded-2xl border bg-card p-4">
+            <div
+              className="size-24 shrink-0 rounded-lg bg-white p-1.5 [&_svg]:size-full"
+              // Server yaratgan SVG (qrcode kutubxonasi) — tashqi kiritma emas
+              dangerouslySetInnerHTML={{ __html: last.qrSvg }}
+            />
+            <div className="grid min-w-0 flex-1 gap-1">
+              <div className="text-sm text-muted-foreground">Oxirgi · #{last.id}</div>
+              <div className="text-xl font-bold">{last.couponsCount} kupon</div>
+              <div className="truncate text-sm text-muted-foreground tabular-nums">{fmtSum(last.amount)}</div>
+              <div className="mt-1 flex gap-2">
+                <Button size="sm" variant="outline" className="h-9" onClick={() => setOnScreen(last)}>
+                  <RiSmartphoneLine /> Ekranda
+                </Button>
+                <Button size="sm" variant="outline" className="h-9" onClick={() => printVoucher(last, paperOf(printOut))}>
+                  <RiPrinterLine /> Chop
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border bg-card">
+          <div className="border-b px-4 py-3 font-medium">
+            Bugungi QR&apos;lar
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {seesAll ? (me.branch ? 'filial bo\'yicha' : 'barcha kassalar') : 'siz chiqargan'}
+            </span>
+          </div>
+          {todayItems.length === 0 ? (
+            <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+              {today.loading ? 'Yuklanmoqda…' : 'Bugun hali QR chiqarilmagan'}
+            </p>
+          ) : (
+            <ul className="max-h-[60vh] divide-y overflow-y-auto">
+              {todayItems.map((v) => (
+                <li key={v.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="grid min-w-0 flex-1 gap-0.5">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-lg font-semibold tabular-nums">{v.couponsCount} kupon</span>
+                      <span className="truncate text-sm text-muted-foreground tabular-nums">{fmtSum(v.amount)}</span>
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground tabular-nums">
+                      #{v.id} · {fmtShort(v.issuedAt).split(' ')[1]}
+                      {v.terminal && ` · ${v.terminal.name}`}
+                      {seesAll && ` · ${v.issuedBy.login}`}
+                      {v.customerPhone && ` · ${fmtPhone(v.customerPhone)}`}
+                    </div>
+                    <VoucherStatusBadge v={v} detail={false} />
+                  </div>
+                  {v.status === 'ISSUED' && new Date(v.expiresAt) > new Date() && (
+                    <div className="flex shrink-0 gap-1">
+                      <Button size="icon-lg" variant="ghost" aria-label="Ekranda" onClick={() => void reprint(v, 'SCREEN')}>
+                        <RiQrCodeLine />
+                      </Button>
+                      <Button size="icon-lg" variant="ghost" aria-label="Qayta chop etish" onClick={() => void reprint(v, printOut)}>
+                        <RiPrinterLine />
+                      </Button>
+                      <Button
+                        size="icon-lg"
+                        variant="ghost"
+                        aria-label="Bekor qilish"
+                        className="text-destructive"
+                        onClick={() => setCancelling(v)}
+                      >
+                        <RiCloseCircleLine />
+                      </Button>
+                    </div>
                   )}
-                  <TableCell className="text-right tabular-nums">{fmtSum(v.amount)}</TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">{v.couponsCount}</TableCell>
-                  <TableCell>
-                    {v.customerName || '—'}
-                    {v.customerPhone && <div className="text-xs text-muted-foreground">{fmtPhone(v.customerPhone)}</div>}
-                  </TableCell>
-                  <TableCell>
-                    <VoucherStatusBadge v={v} />
-                  </TableCell>
-                  <TableCell className="pr-6 text-right">
-                    {v.status === 'ISSUED' && (
-                      <div className="flex justify-end gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => reprint(v)}>
-                          <RiPrinterLine /> Qayta
-                        </Button>
-                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setCancelling(v)}>
-                          <RiCloseCircleLine /> Bekor
-                        </Button>
-                      </div>
-                    )}
-                  </TableCell>
-                </TableRow>
+                </li>
               ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            </ul>
+          )}
+        </div>
+      </aside>
+
+      {onScreen && (
+        <ScreenQr
+          v={onScreen}
+          onClose={() => {
+            setOnScreen(null);
+            void today.reload();
+            setTimeout(() => amountRef.current?.focus(), 0);
+          }}
+          onPrint={() => printVoucher(onScreen, paperOf(printOut))}
+        />
+      )}
 
       <Dialog open={cancelling !== null} onOpenChange={(o) => !o && setCancelling(null)}>
         <DialogContent>
@@ -401,19 +466,101 @@ export default function CashierPage() {
             <DialogDescription>Bekor qilingan QR skanerlansa, kupon berilmaydi.</DialogDescription>
           </DialogHeader>
           <Field>
-            <FieldLabel htmlFor="reason">Sabab</FieldLabel>
-            <Input id="reason" placeholder="Masalan: summa noto'g'ri kiritildi" value={reason} onChange={(e) => setReason(e.target.value)} />
+            <FieldLabel htmlFor="c-r">Sabab</FieldLabel>
+            <Input
+              id="c-r"
+              {...noAutofill('r1')}
+              className="h-11 text-base"
+              placeholder="Masalan: summa noto'g'ri kiritildi"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
           </Field>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCancelling(null)}>
+            <Button variant="outline" size="lg" onClick={() => setCancelling(null)}>
               Yopish
             </Button>
-            <Button variant="destructive" disabled={reason.trim().length < 2} onClick={confirmCancel}>
+            <Button variant="destructive" size="lg" disabled={reason.trim().length < 2} onClick={confirmCancel}>
               Bekor qilish
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </PageContainer>
+    </div>
+  );
+}
+
+/**
+ * QR butun ekranda — mijoz kassir telefoni/Sunmi ekranidan skanerlaydi.
+ * Skanerlanganini o'zi sezadi va yopiladi.
+ */
+function ScreenQr({ v, onClose, onPrint }: { v: Issued; onClose: () => void; onPrint: () => void }) {
+  const [redeemed, setRedeemed] = useState(false);
+  // Ota sahifa qayta chizilganda so'rov taymeri qayta boshlanmasin
+  const close = useRef(onClose);
+  close.current = onClose;
+
+  useEffect(() => {
+    if (redeemed) {
+      const t = setTimeout(() => close.current(), 3500);
+      return () => clearTimeout(t);
+    }
+    const timer = setInterval(async () => {
+      try {
+        const s = await adminApi<{ status: string }>(`/vouchers/${v.id}/status`);
+        if (s.status === 'REDEEMED') setRedeemed(true);
+        if (s.status === 'CANCELLED') close.current();
+      } catch {
+        /* tarmoq uzilsa — keyingi urinish */
+      }
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [v.id, redeemed]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close.current();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-background" role="dialog" aria-modal="true" aria-label={`QR #${v.id}`}>
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+        <div className="text-sm text-muted-foreground tabular-nums">
+          #{v.id} · {v.branchName} · {fmtSum(v.amount)}
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="lg" className="h-11" onClick={onPrint}>
+            <RiPrinterLine /> Chop etish
+          </Button>
+          <Button size="lg" className="h-11" onClick={onClose}>
+            <RiCloseLine /> Yopish
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 p-4 text-center">
+        {redeemed ? (
+          <>
+            <RiCheckboxCircleFill className="size-32 text-emerald-500" />
+            <div className="text-4xl font-bold">Skanerlandi</div>
+            <div className="text-xl text-muted-foreground">Mijozga {v.couponsCount} ta kupon qo&apos;shildi</div>
+          </>
+        ) : (
+          <>
+            <div className="text-5xl font-extrabold tracking-tight md:text-6xl">{v.couponsCount} KUPON</div>
+            <div
+              className="aspect-square w-[min(82vw,58vh)] rounded-3xl bg-white p-4 shadow-sm [&_svg]:size-full"
+              // Server yaratgan SVG (qrcode kutubxonasi) — tashqi kiritma emas
+              dangerouslySetInnerHTML={{ __html: v.qrSvg }}
+            />
+            <div className="max-w-md text-xl font-medium">Telefon kamerasi bilan skanerlang va botda «Start»ni bosing</div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <RiLoader4Line className="size-4 animate-spin" /> Skanerlanishi kutilmoqda · {fmtShort(v.expiresAt)} gacha
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

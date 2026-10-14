@@ -9,11 +9,13 @@ import {
   RiTicket2Line,
   RiReceiptLine,
   RiSettings3Line,
+  RiUserSettingsLine,
   RiUserStarLine,
   type RemixiconComponentType,
 } from '@remixicon/react';
 
 import type { AdminMe } from '@/app/admin/(panel)/admin-context';
+import type { Permission } from '@/lib/permissions';
 
 /**
  * Panel bo'limlari — sidebar va sarlavha uchun YAGONA manba
@@ -27,64 +29,46 @@ export interface NavItem {
 
 export interface NavSection extends NavItem {
   icon: RemixiconComponentType;
-  /** Faqat ADMIN ko'radi (OPERATOR — yo'q) */
-  adminOnly?: boolean;
-  /** Ko'radigan rollar (berilmasa: ADMIN va OPERATOR; adminOnly — faqat ADMIN) */
-  roles?: AdminMe['role'][];
+  /** Shu ruxsatlardan biri bo'lsa ko'rinadi */
+  perm: Permission[];
   /** Ichki sahifalar — sidebar'da bo'lim ostida daraxt bo'lib chiqadi */
   items?: NavItem[];
 }
 
 export const NAV_SECTIONS: NavSection[] = [
-  { title: 'Dashboard', url: '/admin', icon: RiDashboardLine },
-  { title: 'Kassa', url: '/admin/cashier', icon: RiQrCodeLine, roles: ['ADMIN', 'CASHIER'] },
-  { title: 'Vaucherlar', url: '/admin/vouchers', icon: RiTicket2Line },
-  { title: 'Moderatsiya', url: '/admin/moderation', icon: RiEyeLine },
-  { title: 'Cheklar', url: '/admin/receipts', icon: RiReceiptLine },
-  { title: 'Ishtirokchilar', url: '/admin/participants', icon: RiGroupLine },
-  {
-    title: 'Filiallar va FM',
-    url: '/admin/branches',
-    icon: RiBuilding2Line,
-    adminOnly: true,
-  },
-  {
-    title: 'Import va solishtirish',
-    url: '/admin/import',
-    icon: RiArrowLeftRightLine,
-    adminOnly: true,
-  },
-  {
-    title: 'Xodimlar',
-    url: '/admin/staff',
-    icon: RiUserStarLine,
-    adminOnly: true,
-  },
-  {
-    title: 'Eksport',
-    url: '/admin/export',
-    icon: RiDownload2Line,
-    adminOnly: true,
-  },
-  {
-    title: 'Sozlamalar',
-    url: '/admin/settings',
-    icon: RiSettings3Line,
-    adminOnly: true,
-  },
+  { title: 'Dashboard', url: '/admin', icon: RiDashboardLine, perm: ['dashboard'] },
+  { title: 'Kassa', url: '/admin/cashier', icon: RiQrCodeLine, perm: ['cashier'] },
+  { title: 'Vaucherlar', url: '/admin/vouchers', icon: RiTicket2Line, perm: ['vouchers'] },
+  { title: 'Moderatsiya', url: '/admin/moderation', icon: RiEyeLine, perm: ['moderation'] },
+  { title: 'Cheklar', url: '/admin/receipts', icon: RiReceiptLine, perm: ['receipts'] },
+  { title: 'Ishtirokchilar', url: '/admin/participants', icon: RiGroupLine, perm: ['participants'] },
+  { title: 'Filiallar va kassalar', url: '/admin/branches', icon: RiBuilding2Line, perm: ['branches'] },
+  { title: 'Import va solishtirish', url: '/admin/import', icon: RiArrowLeftRightLine, perm: ['import'] },
+  { title: 'Xodimlar', url: '/admin/staff', icon: RiUserStarLine, perm: ['staff'] },
+  { title: 'Eksport', url: '/admin/export', icon: RiDownload2Line, perm: ['export'] },
+  { title: 'Foydalanuvchilar', url: '/admin/users', icon: RiUserSettingsLine, perm: ['users'] },
+  { title: 'Sozlamalar', url: '/admin/settings', icon: RiSettings3Line, perm: ['settings'] },
 ];
 
-/** Rolga ko'ra ko'rinadigan bo'limlar */
-export function sectionsFor(role: AdminMe['role']): NavSection[] {
-  return NAV_SECTIONS.filter((s) => {
-    const roles = s.roles ?? (s.adminOnly ? ['ADMIN'] : ['ADMIN', 'OPERATOR']);
-    return roles.includes(role);
-  });
+/** Xodimga ochiq bo'limlar */
+export function sectionsFor(me: Pick<AdminMe, 'permissions'>): NavSection[] {
+  // Eski API javobida ruxsatlar bo'lmasligi mumkin (deploy oralig'i)
+  const perms = me.permissions ?? [];
+  return NAV_SECTIONS.filter((s) => s.perm.some((p) => perms.includes(p)));
 }
 
-/** Rol kira oladigan birinchi sahifa (kassir — faqat Kassa) */
-export function homeFor(role: AdminMe['role']): string {
-  return role === 'CASHIER' ? '/admin/cashier' : '/admin';
+/** Kira oladigan birinchi sahifa (kassir — Kassa) */
+export function homeFor(me: Pick<AdminMe, 'permissions'>): string | null {
+  return sectionsFor(me)[0]?.url ?? null;
+}
+
+/**
+ * Kassa rejimi: dashboard'i yo'q, kassasi bor xodim (kassir, filial menejeri) —
+ * sidebar o'rniga katta, sodda ekran.
+ */
+export function isKiosk(me: Pick<AdminMe, 'permissions'>): boolean {
+  const perms = me.permissions ?? [];
+  return perms.includes('cashier') && !perms.includes('dashboard');
 }
 
 /**

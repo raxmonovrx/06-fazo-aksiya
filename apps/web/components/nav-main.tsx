@@ -46,7 +46,7 @@ import { cn } from "@/lib/utils"
  * olib qo'yilmaydi.
  */
 export function NavMain() {
-  const sections = sectionsFor(useAdmin().role)
+  const sections = sectionsFor(useAdmin())
   const pathname = usePathname()
   // Ikonkagacha yig'ilgan sidebar (telefonda emas — u yerda to'liq panel ochiladi)
   const { state, isMobile, setOpenMobile } = useSidebar()

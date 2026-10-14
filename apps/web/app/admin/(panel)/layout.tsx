@@ -6,7 +6,10 @@ import { useEffect, useState } from 'react';
 
 import { AppSidebar } from '@/components/app-sidebar';
 import { DashboardShell } from '@/components/dashboard-shell';
-import { homeFor, inSection, sectionsFor } from '@/components/nav-tree';
+import { KioskShell } from '@/components/kiosk-shell';
+import { homeFor, inSection, isKiosk, sectionsFor } from '@/components/nav-tree';
+import { handleLogout } from '@/components/nav-user';
+import { Button } from '@/components/ui/button';
 import { adminApi } from '@/lib/api';
 import { AdminContext, type AdminMe } from './admin-context';
 
@@ -21,6 +24,20 @@ function LoadingScreen() {
   );
 }
 
+function NoAccess({ login }: { login: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-6">
+      <div className="grid w-full max-w-sm gap-3 rounded-2xl border bg-card p-6 text-center shadow-sm">
+        <p className="font-medium">{login}: hech qaysi bo&apos;lim ochilmagan</p>
+        <p className="text-sm text-muted-foreground">Adminga murojaat qiling — u sizga ruxsat beradi.</p>
+        <Button variant="outline" onClick={handleLogout}>
+          Chiqish
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // Shell shu yerda, har sahifada emas: sidebar va sarlavha sahifa
 // almashganda joyida qoladi, faqat kontent maydoni yangilanadi.
 export default function PanelLayout({
@@ -29,11 +46,12 @@ export default function PanelLayout({
   const [me, setMe] = useState<AdminMe | null>(null);
   const pathname = usePathname();
   const router = useRouter();
-  // Rolga tegishli bo'lmagan sahifa ochilsa (masalan kassir /admin) — o'z sahifasiga
-  const allowed = !me || sectionsFor(me.role).some((s) => inSection(pathname, s.url));
+  // Ruxsat berilmagan sahifa ochilsa (masalan kassir /admin) — o'z sahifasiga
+  const allowed = !me || sectionsFor(me).some((s) => inSection(pathname, s.url));
+  const home = me && homeFor(me);
   useEffect(() => {
-    if (me && !allowed) router.replace(homeFor(me.role));
-  }, [me, allowed, router]);
+    if (me && !allowed && home) router.replace(home);
+  }, [me, allowed, home, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,7 +69,16 @@ export default function PanelLayout({
     };
   }, []);
 
+  if (me && !home) return <NoAccess login={me.login} />;
   if (!me || !allowed) return <LoadingScreen />;
+
+  if (isKiosk(me)) {
+    return (
+      <AdminContext.Provider value={me}>
+        <KioskShell>{children}</KioskShell>
+      </AdminContext.Provider>
+    );
+  }
 
   return (
     <AdminContext.Provider value={me}>

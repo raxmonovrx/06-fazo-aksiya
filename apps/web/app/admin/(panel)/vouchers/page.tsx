@@ -33,7 +33,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { adminApi, qs } from '@/lib/api';
 import { fmtPhone, fmtShort, fmtSum } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { useAdmin } from '../admin-context';
+import { can, useAdmin } from '../admin-context';
 
 interface Page {
   total: number;
@@ -51,6 +51,7 @@ const STATUS_OPTIONS = [
 
 export default function VouchersPage() {
   const me = useAdmin();
+  const canCancel = can(me, 'vouchers.cancel');
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [branchId, setBranchId] = useState('');
@@ -126,12 +127,14 @@ export default function VouchersPage() {
           placeholder="#, telefon yoki ism"
         />
         <FacetFilter title="Holat" value={status} onChange={(v) => (setStatus(v), setPage(1))} options={STATUS_OPTIONS} />
+        {!me.branch && (
         <FacetFilter
           title="Filial"
           value={branchId}
           onChange={(v) => (setBranchId(v), setPage(1))}
           options={(branches.data ?? []).map((b) => ({ value: String(b.id), label: b.name }))}
         />
+        )}
         <DateRangeFilter from={range.from} to={range.to} onChange={(r) => (setRange(r), setPage(1))} />
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={flagged} onCheckedChange={(v) => (setFlagged(Boolean(v)), setPage(1))} />
@@ -172,7 +175,7 @@ export default function VouchersPage() {
                 <TableHead>Mijoz (kassir yozgan)</TableHead>
                 <TableHead>Kim skanerladi</TableHead>
                 <TableHead>Holat</TableHead>
-                {me.role === 'ADMIN' && <TableHead className="pr-4" />}
+                {canCancel && <TableHead className="pr-4" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -182,7 +185,10 @@ export default function VouchersPage() {
                   <TableCell className="whitespace-nowrap tabular-nums">{fmtShort(v.issuedAt)}</TableCell>
                   <TableCell>
                     {v.issuedBy.login}
-                    <div className="text-xs text-muted-foreground">{v.branch.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {v.branch.name}
+                      {v.terminal && ` · ${v.terminal.name}`}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{fmtSum(v.amount)}</TableCell>
                   <TableCell className="text-right font-medium tabular-nums">{v.couponsCount}</TableCell>
@@ -212,7 +218,7 @@ export default function VouchersPage() {
                       </div>
                     )}
                   </TableCell>
-                  {me.role === 'ADMIN' && (
+                  {canCancel && (
                     <TableCell className="pr-4 text-right">
                       {v.status === 'ISSUED' && (
                         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setCancelling(v)}>

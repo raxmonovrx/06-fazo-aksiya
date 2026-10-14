@@ -4,6 +4,7 @@ import {
   RiAddLine,
   RiAlertLine,
   RiCalculatorLine,
+  RiComputerLine,
   RiDeleteBinLine,
   RiEdit2Line,
   RiLoader4Line,
@@ -89,6 +90,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { adminApi } from '@/lib/api';
 import { fmtShort, fmtSum } from '@/lib/format';
+import { OUTPUTS, type Terminal, type TerminalOutput } from '@/lib/terminals';
 import { cn } from '@/lib/utils';
 
 interface Device {
@@ -108,6 +110,7 @@ interface Branch {
   maxPerReceipt: number;
   iikoRef: { host?: string; department?: string } | null;
   devices: Device[];
+  terminals: Terminal[];
 }
 interface UnknownFm {
   fm: string;
@@ -117,7 +120,7 @@ interface UnknownFm {
 }
 
 type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
-type EditorTab = 'general' | 'rule' | 'iiko' | 'devices';
+type EditorTab = 'general' | 'rule' | 'iiko' | 'devices' | 'terminals';
 
 /** 100000 → "100 000" (so'msiz) */
 const fmtNum = (v: number | string) =>
@@ -174,7 +177,7 @@ export default function BranchesPage() {
   return (
     <PageContainer size="wide">
       <PageIntro
-        description="Filiallar, ularning kassalari (FM) va kupon qoidalari."
+        description="Filiallar, kupon qoidalari, kassa terminallari (QR shu yerdan chiqadi) va fiskal modullar (FM)."
         actions={
           <Button size="sm" onClick={() => setAdding(true)}>
             <RiAddLine data-icon="inline-start" />
@@ -196,7 +199,7 @@ export default function BranchesPage() {
               <TableHead>Filial</TableHead>
               <TableHead className="w-36">Holat</TableHead>
               <TableHead>Kupon qoidasi</TableHead>
-              <TableHead className="w-28">Kassalar</TableHead>
+              <TableHead className="w-32">Terminallar</TableHead>
               <TableHead>iiko</TableHead>
               <TableHead className="w-12" />
             </TableRow>
@@ -275,10 +278,10 @@ export default function BranchesPage() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  {b.devices.length ? (
+                  {b.terminals.some((t) => t.isActive) ? (
                     <Badge variant="secondary" className="tabular-nums">
-                      <RiCalculatorLine data-icon="inline-start" />
-                      {b.devices.length}
+                      <RiComputerLine data-icon="inline-start" />
+                      {b.terminals.filter((t) => t.isActive).length}
                     </Badge>
                   ) : (
                     <Badge
@@ -288,6 +291,9 @@ export default function BranchesPage() {
                       yo&apos;q
                     </Badge>
                   )}
+                  <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                    {b.devices.length} ta FM
+                  </div>
                 </TableCell>
                 <TableCell className="max-w-64">
                   {b.iikoRef?.department || b.iikoRef?.host ? (
@@ -327,9 +333,13 @@ export default function BranchesPage() {
                           <RiEdit2Line />
                           Tahrirlash
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => open(b.id, 'terminals')}>
+                          <RiComputerLine />
+                          Terminallar
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => open(b.id, 'devices')}>
                           <RiCalculatorLine />
-                          Kassalar
+                          Fiskal modullar
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -550,7 +560,7 @@ function BranchEditor({
         <SheetTitle>{b.name}</SheetTitle>
         <SheetDescription>
           {b.brand ? `${b.brand} · ` : ''}
-          {b.devices.length} ta kassa
+          {b.terminals.filter((t) => t.isActive).length} ta terminal · {b.devices.length} ta FM
         </SheetDescription>
       </SheetHeader>
 
@@ -564,8 +574,14 @@ function BranchEditor({
             <TabsTrigger value="general">Umumiy</TabsTrigger>
             <TabsTrigger value="rule">Kupon qoidasi</TabsTrigger>
             <TabsTrigger value="iiko">iiko</TabsTrigger>
+            <TabsTrigger value="terminals">
+              Terminallar
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {b.terminals.filter((t) => t.isActive).length}
+              </span>
+            </TabsTrigger>
             <TabsTrigger value="devices">
-              Kassalar
+              FM
               <span className="text-xs text-muted-foreground tabular-nums">
                 {b.devices.length}
               </span>
@@ -690,6 +706,11 @@ function BranchEditor({
             </FieldGroup>
           </TabsContent>
 
+          <TabsContent value="terminals" className="flex flex-col gap-4">
+            <TerminalsList terminals={b.terminals} run={run} />
+            <AddTerminalForm branchId={b.id} run={run} />
+          </TabsContent>
+
           <TabsContent value="devices" className="flex flex-col gap-4">
             <DevicesList devices={b.devices} run={run} />
             <AddDeviceForm branchId={b.id} run={run} />
@@ -698,9 +719,9 @@ function BranchEditor({
       </Tabs>
 
       <SheetFooter className="flex-row items-center justify-end border-t">
-        {tab === 'devices' && (
+        {(tab === 'devices' || tab === 'terminals') && (
           <span className="mr-auto hidden text-xs text-muted-foreground sm:inline">
-            Kassalar darhol saqlanadi
+            {tab === 'devices' ? 'FM' : 'Terminallar'} darhol saqlanadi
           </span>
         )}
         <Button variant="outline" onClick={onClose} disabled={busy}>
@@ -724,7 +745,7 @@ function DevicesList({ devices, run }: { devices: Device[]; run: Run }) {
         <EmptyState
           className="py-8"
           icon={RiCalculatorLine}
-          title="Kassa qo'shilmagan"
+          title="FM qo'shilmagan"
           description="Quyida FM raqamini kiriting — shu kassa cheklari filialga bog'lanadi."
         />
       </div>
@@ -845,7 +866,7 @@ function AddDeviceForm({ branchId, run }: { branchId: number; run: Run }) {
         setBusy(false);
       }}
     >
-      <div className="text-sm font-medium">Kassa qo&apos;shish</div>
+      <div className="text-sm font-medium">FM qo&apos;shish</div>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field>
           <FieldLabel htmlFor={id('fm')}>FM raqami</FieldLabel>
@@ -977,5 +998,170 @@ function NewBranchDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const OUTPUT_ITEMS = (Object.keys(OUTPUTS) as TerminalOutput[]).map((k) => ({ value: k, label: OUTPUTS[k].label }));
+
+function OutputSelect({
+  id,
+  value,
+  onChange,
+  size,
+}: {
+  id?: string;
+  value: TerminalOutput;
+  onChange: (v: TerminalOutput) => void;
+  size?: 'sm' | 'default';
+}) {
+  return (
+    <Select items={OUTPUT_ITEMS} value={value} onValueChange={(v) => v && onChange(v as TerminalOutput)}>
+      <SelectTrigger id={id} size={size} className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {OUTPUT_ITEMS.map((i) => (
+          <SelectItem key={i.value} value={i.value}>
+            {i.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** Kassa terminallari: kassir Kassa sahifasida shu tugmalarni ko'radi */
+function TerminalsList({ terminals, run }: { terminals: Terminal[]; run: Run }) {
+  if (!terminals.length)
+    return (
+      <div className="rounded-lg border border-dashed">
+        <EmptyState
+          className="py-8"
+          icon={RiComputerLine}
+          title="Terminal qo'shilmagan"
+          description="Har bir kassa (kompyuter, Sunmi, planshet) uchun terminal qo'shing — kassir uni bir bosishda tanlaydi va QR shu usulda chiqadi."
+        />
+      </div>
+    );
+
+  const patch = (t: Terminal, json: Partial<Terminal>, ok: string) =>
+    void run(() => adminApi(`/terminals/${t.id}`, { method: 'PATCH', json }), ok);
+
+  return (
+    <DataTableCard className="rounded-lg">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead>Nomi</TableHead>
+            <TableHead className="w-48">QR chiqishi</TableHead>
+            <TableHead className="w-16">Faol</TableHead>
+            <TableHead className="w-10" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {terminals.map((t) => (
+            <TableRow key={t.id} className={cn(!t.isActive && 'opacity-60')}>
+              <TableCell className="font-medium">{t.name}</TableCell>
+              <TableCell>
+                <OutputSelect size="sm" value={t.output} onChange={(output) => patch(t, { output }, `${t.name}: ${OUTPUTS[output].label}`)} />
+              </TableCell>
+              <TableCell>
+                <Switch
+                  size="sm"
+                  checked={t.isActive}
+                  aria-label={`${t.name} faol`}
+                  onCheckedChange={(isActive) => patch(t, { isActive }, isActive ? `${t.name} yoqildi` : `${t.name} o'chirildi`)}
+                />
+              </TableCell>
+              <TableCell className="text-right">
+                <AlertDialog>
+                  <AlertDialogTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="O'chirish"
+                        className="text-muted-foreground hover:text-destructive"
+                      />
+                    }
+                  >
+                    <RiDeleteBinLine />
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t.name} o&apos;chirilsinmi?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Kassirlar uni endi ko&apos;rmaydi. Bu terminaldan QR chiqarilgan bo&apos;lsa, tarix uchun saqlanib, faqat
+                        faolsizlantiriladi.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
+                      <AlertDialogAction
+                        render={<Button variant="destructive" />}
+                        onClick={() => void run(() => adminApi(`/terminals/${t.id}`, { method: 'DELETE' }), "Terminal o'chirildi")}
+                      >
+                        O&apos;chirish
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </DataTableCard>
+  );
+}
+
+function AddTerminalForm({ branchId, run }: { branchId: number; run: Run }) {
+  const [name, setName] = useState('');
+  const [output, setOutput] = useState<TerminalOutput>('PRINT_80');
+  const [busy, setBusy] = useState(false);
+  const id = (k: string) => `term${branchId}-${k}`;
+
+  return (
+    <form
+      className="grid gap-3 rounded-lg border bg-muted/30 p-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        const ok = await run(
+          () => adminApi(`/branches/${branchId}/terminals`, { method: 'POST', json: { name: name.trim(), output } }),
+          `${name.trim()} qo'shildi`,
+        );
+        if (ok) setName('');
+        setBusy(false);
+      }}
+    >
+      <div className="text-sm font-medium">Terminal qo&apos;shish</div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor={id('name')}>Nomi</FieldLabel>
+          <Input
+            id={id('name')}
+            placeholder="Masalan: 1-kassa yoki Sunmi"
+            autoComplete="off"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={id('out')}>QR chiqishi</FieldLabel>
+          <OutputSelect id={id('out')} value={output} onChange={setOutput} />
+        </Field>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Printer — QR brauzer bosma oynasi orqali termoprinterga chiqadi. Ekranda — QR katta qilib ko&apos;rsatiladi, mijoz
+        ekrandan skanerlaydi (Sunmi, planshet).
+      </p>
+      <div className="flex justify-end">
+        <Button type="submit" variant="secondary" size="sm" disabled={busy || !name.trim()}>
+          {busy ? <RiLoader4Line data-icon="inline-start" className="animate-spin" /> : <RiAddLine data-icon="inline-start" />}
+          Qo&apos;shish
+        </Button>
+      </div>
+    </form>
   );
 }

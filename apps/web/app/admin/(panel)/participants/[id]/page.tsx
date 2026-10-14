@@ -68,7 +68,7 @@ import {
 import { adminApi, qs } from '@/lib/api';
 import { fmtDate, fmtPhone, fmtShort, fmtSum } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { useAdmin } from '../../admin-context';
+import { can, useAdmin } from '../../admin-context';
 
 interface Detail {
   id: number;
@@ -213,7 +213,7 @@ export default function ParticipantPage() {
     }
   };
 
-  const isAdmin = me.role === 'ADMIN';
+  const isAdmin = can(me, 'participants.edit');
   const who = p.phone ?? (name || `#${p.id}`);
   const openReceipt = (rid: number) => router.push(`/admin/receipts/${rid}`);
 

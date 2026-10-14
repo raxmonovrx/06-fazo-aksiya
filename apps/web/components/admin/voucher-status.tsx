@@ -25,6 +25,7 @@ export interface VoucherRow {
   cancelReason: string | null;
   cancelledAt: string | null;
   branch: { id: number; name: string };
+  terminal: { id: number; name: string } | null;
   issuedBy: { id: number; login: string };
   cancelledBy: { id: number; login: string } | null;
   redeemedBy: { id: number; phone: string | null; firstName: string | null; lastName: string | null } | null;

@@ -264,7 +264,9 @@ describe('Vaucherlar (kassir QR)', () => {
     await api('tv_admin', `/terminals/${sunmi.id}`, { method: 'PATCH', json: { isActive: false } });
 
     const list = await (await api('tv_kassa1', `/terminals?branchId=${leFazoId}`)).json();
-    expect(list.map((x: any) => x.id)).toEqual([k1.id]); // o'z filiali, faqat faol
+    // o'z filiali, faqat faol (bazadagi boshqa terminallarga qaramaymiz)
+    expect(list.filter((x: any) => x.name.startsWith('tv_')).map((x: any) => x.id)).toEqual([k1.id]);
+    expect(list.every((x: any) => x.branchId === fazoId && x.isActive)).toBe(true);
     expect((await api('tv_kassa1', `/branches/${fazoId}/terminals`, { method: 'POST', json: { name: 'tv_x', output: 'SCREEN' } })).status).toBe(403);
 
     expect((await api('tv_kassa1', '/vouchers', { method: 'POST', json: { amount: 200000, terminalId: le.id } })).status).toBe(400);

@@ -27,9 +27,10 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { adminApi } from '@/lib/api';
+import { roleLabel } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 
-async function handleLogout() {
+export async function handleLogout() {
   try {
     await adminApi('/auth/logout', { method: 'POST' });
   } catch {
@@ -55,11 +56,6 @@ export function initialsFrom(login: string): string {
   ).toUpperCase();
 }
 
-const ROLE_LABELS: Record<AdminMe['role'], string> = {
-  ADMIN: 'Admin',
-  OPERATOR: 'Operator',
-  CASHIER: 'Kassir',
-};
 
 /** Menyu bandi — blokdagidan balandroq, ikonka xiraroq */
 const MENU_ITEM =
@@ -88,7 +84,7 @@ export function NavUser({ login, role }: Pick<AdminMe, 'login' | 'role'>) {
             <div className="grid min-w-0 flex-1 gap-0.5 text-left leading-tight">
               <span className="truncate text-sm font-medium">{login}</span>
               <span className="truncate text-xs text-muted-foreground">
-                {ROLE_LABELS[role]}
+                {roleLabel(role)}
               </span>
             </div>
             <RiExpandUpDownLine className="ml-auto size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
@@ -111,7 +107,7 @@ export function NavUser({ login, role }: Pick<AdminMe, 'login' | 'role'>) {
                       Fazo Club
                     </span>
                     <span className="ml-auto shrink-0 rounded-md bg-sidebar-primary/15 px-1.5 py-0.5 text-[11px] leading-none font-medium text-sidebar-primary">
-                      {ROLE_LABELS[role]}
+                      {roleLabel(role)}
                     </span>
                   </div>
                   <span className="truncate text-xs text-muted-foreground">
