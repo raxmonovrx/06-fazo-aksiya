@@ -1,5 +1,7 @@
 'use client';
 
+import { DEFAULT_RECEIPT_TEXTS, type ReceiptTexts } from './receipt-texts';
+
 /**
  * Vaucher QR'ini termoprinterga (58/80 mm) chop etish. Alohida yashirin iframe
  * ichida — panel sahifasi bosma uslublariga aralashmaydi. Brauzer bosma oynasida
@@ -15,6 +17,8 @@ export interface PrintableVoucher {
   qrSvg: string;
   /** Filial chek logosi (oq-qora PNG data URL) — admin yoqgan bo'lsa */
   logo?: string | null;
+  /** Filial chek matnlari (admin sozlaydi); berilmasa — standart */
+  texts?: ReceiptTexts;
 }
 
 export type PaperWidth = 58 | 80;
@@ -23,6 +27,8 @@ export type PaperWidth = 58 | 80;
 const SAFE_PNG = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/;
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/** Matn qatorlari (Enter — yangi qator); bo'sh bo'lsa hech narsa */
+const lines = (s: string, cls: string) => (s.trim() ? `<div class="${cls}">${esc(s.trim()).replace(/\n/g, '<br>')}</div>` : '');
 const sum = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/ /g, ' ');
 const dt = (iso: string) =>
   new Intl.DateTimeFormat('ru-RU', {
@@ -40,7 +46,8 @@ export function ticketHtml(v: PrintableVoucher, paper: PaperWidth): string {
   const width = paper === 80 ? 72 : 48; // chop etiladigan kenglik (mm)
   const qr = paper === 80 ? 52 : 40;
   const logo = paper === 80 ? 26 : 20;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Fazo Group #${v.id}</title><style>
+  const t = v.texts ?? DEFAULT_RECEIPT_TEXTS;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(t.title || 'Chek')} #${v.id}</title><style>
 @page { size: ${paper}mm auto; margin: 0; }
 * { box-sizing: border-box; }
 body { margin: 0; width: ${paper}mm; font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; color: #000; }
@@ -55,17 +62,19 @@ body { margin: 0; width: ${paper}mm; font-family: -apple-system, 'Segoe UI', Rob
 .qr svg { width: 100%; height: 100%; display: block; }
 .hint { font-size: 12px; font-weight: 600; line-height: 1.35; }
 .small { font-size: 10px; margin-top: 1.5mm; }
+.foot { font-size: 11px; margin-top: 3mm; padding-top: 2mm; border-top: 1px dashed #000; line-height: 1.35; }
 </style></head><body><div class="t">
 ${v.logo && SAFE_PNG.test(v.logo) ? `<img class="logo" src="${v.logo}" alt="">` : ''}
-<div class="brand">FAZO GROUP</div>
-<div class="sub">“KIA SONET MENIKI” aksiyasi</div>
+${lines(t.title, 'brand')}
+${lines(t.subtitle, 'sub')}
 <div class="hr"></div>
 <div class="big">${v.couponsCount} KUPON</div>
 <div class="row">${esc(v.branchName)} · ${sum(v.amount)} so'm</div>
 <div class="row">${dt(v.issuedAt)} · #${v.id}</div>
 <div class="qr">${v.qrSvg}</div>
-<div class="hint">Telefon kamerasi bilan skanerlang<br>va botda «Start»ni bosing</div>
+${lines(t.hint, 'hint')}
 <div class="small">Amal qiladi: ${dt(v.expiresAt)} gacha<br>Bir martalik QR</div>
+${lines(t.footer, 'foot')}
 </div></body></html>`;
 }
 

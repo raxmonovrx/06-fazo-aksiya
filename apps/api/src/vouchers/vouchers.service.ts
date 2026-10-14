@@ -8,6 +8,7 @@ import { CampaignService } from '../campaign/campaign.service.js';
 import { config } from '../config.js';
 import { calcCoupons } from '../core/coupons.js';
 import { toImageDataUrl } from '../core/image-data-url.js';
+import { resolveReceiptTexts } from '../core/receipt-texts.js';
 import { normalizePhone } from '../core/phone.js';
 import { formatTashkent, tashkentDayStart } from '../core/time.js';
 import { newVoucherToken, voucherStartParam } from '../core/voucher-token.js';
@@ -122,8 +123,13 @@ export class VouchersService {
     return this.present(voucher, branch.name, true, branch);
   }
 
-  /** QR va havola bilan (chop etish / qayta chop etish uchun). `logoOf` — filial chek logosi */
-  async present(v: Voucher, branchName: string, withQr: boolean, logoOf?: { logoEnabled: boolean; logoPrint?: Uint8Array | null }) {
+  /** QR va havola bilan (chop etish / qayta chop etish uchun). `ticketOf` — filialning chek logosi va matnlari */
+  async present(
+    v: Voucher,
+    branchName: string,
+    withQr: boolean,
+    ticketOf?: { logoEnabled: boolean; logoPrint?: Uint8Array | null; receiptTexts?: unknown },
+  ) {
     const link = voucherLink(v.token);
     return {
       id: v.id,
@@ -140,7 +146,8 @@ export class VouchersService {
       link,
       ...(withQr && {
         qrSvg: await QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }),
-        logo: logoOf?.logoEnabled ? toImageDataUrl(logoOf.logoPrint) : null,
+        logo: ticketOf?.logoEnabled ? toImageDataUrl(ticketOf.logoPrint) : null,
+        texts: resolveReceiptTexts(ticketOf?.receiptTexts),
       }),
     };
   }

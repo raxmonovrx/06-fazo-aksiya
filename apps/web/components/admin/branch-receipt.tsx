@@ -6,21 +6,33 @@ import { toast } from 'sonner';
 
 import { ErrorAlert, useLoad } from '@/components/admin/kit';
 import { Button } from '@/components/ui/button';
-import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { adminApi } from '@/lib/api';
 import { loadImage, prepareOriginal, suggest, toPrint } from '@/lib/logo-process';
+import { DEFAULT_RECEIPT_TEXTS, RECEIPT_TEXT_LIMITS, type ReceiptTexts } from '@/lib/receipt-texts';
 import { cn } from '@/lib/utils';
 import { ticketHtml, type PaperWidth } from '@/lib/voucher-print';
 
-interface LogoState {
+interface ReceiptState {
   enabled: boolean;
   threshold: number;
   invert: boolean;
   updatedAt: string | null;
   original: string | null;
   print: string | null;
+  texts: ReceiptTexts;
 }
+
+const TEXT_FIELDS: Array<{ key: keyof ReceiptTexts; label: string; hint: string; multiline?: boolean }> = [
+  { key: 'title', label: 'Sarlavha', hint: 'Logodan keyin, katta harf bilan' },
+  { key: 'subtitle', label: 'Kichik sarlavha', hint: 'Masalan aksiya nomi' },
+  { key: 'hint', label: "Ko'rsatma", hint: 'QR ostida — Enter bilan yangi qator', multiline: true },
+  { key: 'footer', label: 'Pastki matn', hint: 'Masalan: telefon, manzil, Instagram', multiline: true },
+];
 
 /** Namunadagi QR o'rnida — oddiy katak (haqiqiy QR kassada chiqadi) */
 const SAMPLE_QR =
@@ -29,11 +41,13 @@ const SAMPLE_QR =
   '<path d="M3 3h3v3H3zM23 3h3v3h-3zM3 23h3v3H3zM11 2h2v2h-2zM14 5h3v2h-3zM11 9h2v3h-2zM15 11h4v2h-4zM20 14h3v3h-3zM10 15h3v2h-3zM14 18h2v4h-2zM18 20h4v2h-4zM23 23h3v3h-3zM12 24h3v2h-3zM24 10h3v2h-3z"/></svg>';
 
 /**
- * Filial chek logosi: admin istalgan rasmni yuklaydi, brauzerda oq-qora qilinadi
- * (termoprinter faqat qora chiqaradi). Kassir hech narsa sozlamaydi.
+ * Filial cheki: logo (admin istalgan rasmni yuklaydi, brauzerda oq-qora qilinadi —
+ * termoprinter faqat qora chiqaradi) va matnlar. Kassir hech narsa sozlamaydi.
  */
-export function BranchLogo({ branchId, branchName }: { branchId: number; branchName: string }) {
-  const data = useLoad(() => adminApi<LogoState>(`/branches/${branchId}/logo`), [branchId]);
+export function BranchReceipt({ branchId, branchName }: { branchId: number; branchName: string }) {
+  const data = useLoad(() => adminApi<ReceiptState>(`/branches/${branchId}/receipt`), [branchId]);
+  const [texts, setTexts] = useState<ReceiptTexts>(DEFAULT_RECEIPT_TEXTS);
+  const [toAll, setToAll] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [threshold, setThreshold] = useState(160);
   const [invert, setInvert] = useState(false);
@@ -52,6 +66,8 @@ export function BranchLogo({ branchId, branchName }: { branchId: number; branchN
     setThreshold(d.threshold);
     setInvert(d.invert);
     setOriginal(d.original);
+    setTexts(d.texts);
+    setToAll(false);
     setInited(true);
   }, [data.data, inited]);
 
@@ -68,7 +84,12 @@ export function BranchLogo({ branchId, branchName }: { branchId: number; branchN
   const saved = data.data;
   const dirty =
     !!saved &&
-    (enabled !== saved.enabled || threshold !== saved.threshold || invert !== saved.invert || original !== saved.original);
+    (enabled !== saved.enabled ||
+      threshold !== saved.threshold ||
+      invert !== saved.invert ||
+      original !== saved.original ||
+      JSON.stringify(texts) !== JSON.stringify(saved.texts) ||
+      toAll);
 
   const pick = async (file: File | undefined) => {
     if (!file) return;
@@ -97,7 +118,7 @@ export function BranchLogo({ branchId, branchName }: { branchId: number; branchN
     setBusy(true);
     try {
       const imageChanged = original !== saved?.original;
-      const next = await adminApi<LogoState>(`/branches/${branchId}/logo`, {
+      const next = await adminApi<ReceiptState>(`/branches/${branchId}/receipt`, {
         method: 'PUT',
         json: {
           enabled: Boolean(enabled && original),
@@ -106,9 +127,12 @@ export function BranchLogo({ branchId, branchName }: { branchId: number; branchN
           // Rasm o'zgarmagan bo'lsa ham, chegara o'zgargan bo'lishi mumkin — chek varianti har doim yangilanadi
           ...(imageChanged && { original }),
           print: original ? print : null,
+          texts,
+          textsToAll: toAll,
         },
       });
-      toast.success(`${branchName}: chek sozlamasi saqlandi`);
+      toast.success(toAll ? 'Chek saqlandi, matnlar barcha filiallarga qo\'llandi' : `${branchName}: chek sozlamasi saqlandi`);
+      setToAll(false);
       await data.reload();
       setEnabled(next.enabled);
       setOriginal(next.original);
@@ -131,10 +155,11 @@ export function BranchLogo({ branchId, branchName }: { branchId: number; branchN
           expiresAt: new Date(Date.now() + 72 * 3600_000).toISOString(),
           qrSvg: SAMPLE_QR,
           logo: enabled ? print : null,
+          texts,
         },
         paper,
       ),
-    [branchName, enabled, print, paper],
+    [branchName, enabled, print, paper, texts],
   );
 
   if (data.error) return <ErrorAlert error={data.error} />;
@@ -251,6 +276,46 @@ export function BranchLogo({ branchId, branchName }: { branchId: number; branchN
           </div>
         </div>
       )}
+
+      <div className="grid gap-3 rounded-lg border p-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-sm font-medium">Chek matnlari</span>
+          {JSON.stringify(texts) !== JSON.stringify(DEFAULT_RECEIPT_TEXTS) && (
+            <button type="button" className="text-xs text-primary hover:underline" onClick={() => setTexts(DEFAULT_RECEIPT_TEXTS)}>
+              Standartga qaytarish
+            </button>
+          )}
+        </div>
+        <FieldGroup className="gap-3">
+          {TEXT_FIELDS.map((f) => {
+            const id = `rt-${f.key}-${branchId}`;
+            const Comp = f.multiline ? Textarea : Input;
+            return (
+              <Field key={f.key}>
+                <FieldLabel htmlFor={id}>{f.label}</FieldLabel>
+                <Comp
+                  id={id}
+                  value={texts[f.key]}
+                  maxLength={RECEIPT_TEXT_LIMITS[f.key]}
+                  rows={f.multiline ? 2 : undefined}
+                  placeholder="Bo'sh — chekda chiqmaydi"
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+                    setTexts({ ...texts, [f.key]: e.target.value })
+                  }
+                />
+                <FieldDescription>{f.hint}</FieldDescription>
+              </Field>
+            );
+          })}
+        </FieldGroup>
+        <p className="text-xs text-muted-foreground">
+          Kupon soni, filial, summa, sana, QR va amal qilish muddati avtomatik yoziladi.
+        </p>
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox checked={toAll} onCheckedChange={(c) => setToAll(Boolean(c))} />
+          Matnlarni barcha filiallarga ham qo&apos;llash (logo — faqat shu filialga)
+        </label>
+      </div>
 
       <div className="grid gap-2">
         <div className="flex items-center justify-between">

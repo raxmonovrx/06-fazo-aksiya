@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 import { ROLE_TEMPLATES } from '../src/admin/permissions.js';
 import { signInitData } from '../src/core/init-data.js';
@@ -286,7 +286,7 @@ describe('Vaucherlar (kassir QR)', () => {
 
   it('chek logosi: admin yuklaydi va yoqadi, QR javobida chiqadi; ro\'yxatlarda baytlar yo\'q', async () => {
     const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==';
-    const put = (who: string, json: unknown) => api(who, `/branches/${fazoId}/logo`, { method: 'PUT', json });
+    const put = (who: string, json: unknown) => api(who, `/branches/${fazoId}/receipt`, { method: 'PUT', json });
     try {
       expect((await put('tv_kassa1', { enabled: true, threshold: 160, invert: false, print: PNG })).status).toBe(403);
       // Logosiz yoqib bo'lmaydi; PNG bo'lmagan "rasm" qabul qilinmaydi
@@ -309,8 +309,19 @@ describe('Vaucherlar (kassir QR)', () => {
       expect(b).not.toHaveProperty('logoOriginal');
 
       await put('tv_admin', { enabled: false, threshold: 120, invert: true });
-      expect((await issue('tv_kassa1', { amount: 200000 })).logo).toBeNull();
+      const plain = await issue('tv_kassa1', { amount: 200000 });
+      expect(plain.logo).toBeNull();
+      // Standart matnlar
+      expect(plain.texts).toMatchObject({ title: 'FAZO GROUP', footer: '' });
+
+      // Matnlar: shu filial va «barcha filiallarga»
+      const texts = { title: 'FAZO', subtitle: 'Yangi aksiya', hint: 'Skanerlang', footer: 'Aloqa: 71 200 00 00' };
+      expect((await put('tv_admin', { enabled: false, threshold: 120, invert: true, texts: { ...texts, title: 'x'.repeat(41) } })).status).toBe(400);
+      expect((await (await put('tv_admin', { enabled: false, threshold: 120, invert: true, texts, textsToAll: true })).json()).texts).toEqual(texts);
+      expect((await issue('tv_kassa1', { amount: 200000 })).texts).toEqual(texts);
+      expect((await (await api('tv_admin', `/branches/${leFazoId}/receipt`)).json()).texts).toEqual(texts);
     } finally {
+      await prisma.branch.updateMany({ data: { receiptTexts: Prisma.DbNull } });
       await prisma.branch.update({
         where: { id: fazoId },
         data: { logoEnabled: false, logoOriginal: null, logoPrint: null, logoThreshold: 160, logoInvert: false, logoUpdatedAt: null },

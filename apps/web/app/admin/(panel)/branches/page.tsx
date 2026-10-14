@@ -14,7 +14,7 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { BranchLogo } from '@/components/admin/branch-logo';
+import { BranchReceipt } from '@/components/admin/branch-receipt';
 import { DataTableCard } from '@/components/admin/data-table';
 import { ErrorAlert, TableLoading, useLoad } from '@/components/admin/kit';
 import {
@@ -709,7 +709,7 @@ function BranchEditor({
           </TabsContent>
 
           <TabsContent value="receipt">
-            <BranchLogo branchId={b.id} branchName={b.name} />
+            <BranchReceipt branchId={b.id} branchName={b.name} />
           </TabsContent>
 
           <TabsContent value="terminals" className="flex flex-col gap-4">

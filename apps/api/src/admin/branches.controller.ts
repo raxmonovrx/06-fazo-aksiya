@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { decodeImageDataUrl, toImageDataUrl } from '../core/image-data-url.js';
 import { normalizeFm } from '../core/receipt-qr.js';
+import { resolveReceiptTexts, receiptTextsSchema } from '../core/receipt-texts.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ReconcileService } from '../reconcile/reconcile.service.js';
 import { AdminGuard, AnyStaff, CurrentAdmin, Perm } from './auth.js';
@@ -27,6 +28,9 @@ const logoSchema = z.object({
   // Berilmasa — o'zgarmaydi; null — logoni o'chirish
   original: z.string().max(3_000_000).nullable().optional(),
   print: z.string().max(1_000_000).nullable().optional(),
+  texts: receiptTextsSchema.optional(),
+  // Matnlarni barcha filiallarga ham qo'llash (logo — faqat shu filialga)
+  textsToAll: z.boolean().optional(),
 });
 /** Asl rasm (qayta sozlash uchun) va chekka chiqadigan oq-qora PNG chegaralari */
 const LOGO_ORIGINAL_MAX = 1_500_000;
@@ -123,9 +127,9 @@ export class BranchesController {
     return { ok: true };
   }
 
-  /** Chek logosi sozlamasi (asl rasm bilan — panelda qayta oq-qora qilish uchun) */
-  @Get('branches/:id/logo')
-  async logo(@Param('id', ParseIntPipe) id: number) {
+  /** Chek sozlamasi: logo (asl rasm bilan — panelda qayta oq-qora qilish uchun) va matnlar */
+  @Get('branches/:id/receipt')
+  async receipt(@Param('id', ParseIntPipe) id: number) {
     const b = await this.prisma.branch.findUnique({ where: { id }, omit: { logoOriginal: false, logoPrint: false } });
     if (!b) throw new NotFoundException();
     return {
@@ -135,11 +139,12 @@ export class BranchesController {
       updatedAt: b.logoUpdatedAt,
       original: toImageDataUrl(b.logoOriginal),
       print: toImageDataUrl(b.logoPrint),
+      texts: resolveReceiptTexts(b.receiptTexts),
     };
   }
 
-  @Put('branches/:id/logo')
-  async saveLogo(@Param('id', ParseIntPipe) id: number, @Body() body: unknown, @CurrentAdmin() admin: AdminUser) {
+  @Put('branches/:id/receipt')
+  async saveReceipt(@Param('id', ParseIntPipe) id: number, @Body() body: unknown, @CurrentAdmin() admin: AdminUser) {
     const data = parse(logoSchema, body);
     const b = await this.prisma.branch.findUnique({ where: { id }, omit: { logoPrint: false } });
     if (!b) throw new NotFoundException();
@@ -166,15 +171,20 @@ export class BranchesController {
         logoInvert: data.invert,
         ...bytes,
         ...((bytes.logoOriginal !== undefined || bytes.logoPrint !== undefined) && { logoUpdatedAt: new Date() }),
+        ...(data.texts && { receiptTexts: data.texts }),
       },
     });
-    await this.audit.log(admin.id, 'branch.logo', 'branch', id, {
+    if (data.texts && data.textsToAll) {
+      await this.prisma.branch.updateMany({ where: { id: { not: id } }, data: { receiptTexts: data.texts } });
+    }
+    await this.audit.log(admin.id, 'branch.receipt', 'branch', id, {
+      ...(data.texts && { texts: data.texts, textsToAll: Boolean(data.textsToAll) }),
       enabled: data.enabled,
       threshold: data.threshold,
       invert: data.invert,
       ...(bytes.logoPrint !== undefined && { print: bytes.logoPrint ? `${bytes.logoPrint.length} B` : null }),
     });
-    return this.logo(id);
+    return this.receipt(id);
   }
 
   @Get('unknown-fms')

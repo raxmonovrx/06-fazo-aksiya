@@ -51,6 +51,8 @@ model Branch {
   logoThreshold Int       @default(160)
   logoInvert    Boolean   @default(false)
   logoUpdatedAt DateTime? @db.Timestamptz(3)
+  // Chek matnlari: { title, subtitle, hint, footer } — bo'sh bo'lsa standart matn
+  receiptTexts  Json?
   createdAt     DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
 
