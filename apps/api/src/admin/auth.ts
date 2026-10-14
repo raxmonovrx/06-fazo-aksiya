@@ -40,6 +40,8 @@ const ANY = '*';
  * bo'lmasa — faqat ADMIN (yangi endpoint tasodifan ochilib qolmasin).
  */
 export const Perm = (...perms: Permission[]) => SetMetadata(PERMS_KEY, perms);
+/** Faqat ADMIN (controller darajasidagi @Perm'ni bekor qiladi) */
+export const AdminOnly = () => SetMetadata(PERMS_KEY, []);
 /** Har qanday kirgan xodim (masalan /auth/me, filiallar ro'yxati) */
 export const AnyStaff = () => SetMetadata(PERMS_KEY, [ANY]);
 

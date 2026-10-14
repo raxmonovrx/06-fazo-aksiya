@@ -347,4 +347,26 @@ describe('Vaucherlar (kassir QR)', () => {
       expect(res.status).toBe(401);
     });
   });
+
+  it('ishtirokchini o\'chirish: faqat admin; kuponlar ketadi, QR qayta ishlatilmaydi, /start — yangidan', async () => {
+    const p = await prisma.participant.findUniqueOrThrow({ where: { tgId: BigInt(tg(1)) } });
+    const used = await prisma.voucher.findFirstOrThrow({ where: { redeemedById: p.id } });
+    expect((await api('tv_op', `/participants/${p.id}`, { method: 'DELETE' })).status).toBe(403);
+    expect((await api('tv_manager', `/participants/${p.id}`, { method: 'DELETE' })).status).toBe(403);
+
+    const res = await (await api('tv_admin', `/participants/${p.id}`, { method: 'DELETE' })).json();
+    expect(res).toMatchObject({ ok: true });
+    expect(res.coupons).toBeGreaterThan(0);
+    expect(await prisma.participant.findUnique({ where: { id: p.id } })).toBeNull();
+    expect(await prisma.coupon.count({ where: { participantId: p.id } })).toBe(0);
+    const v = await prisma.voucher.findUniqueOrThrow({ where: { id: used.id } });
+    expect(v).toMatchObject({ status: 'REDEEMED', redeemedById: null, receiptId: null, redeemedPhone: '+998995000001' });
+
+    // Shu Telegram akkaunt endi yangi foydalanuvchi; eski QR baribir ishlamaydi
+    t.calls.length = 0;
+    await t.send(textMessage(tg(1), `/start v_${used.token}`));
+    expect(lastText(t.calls, tg(1))).toContain('telefon raqamingizni');
+    await t.send(contactMessage(tg(1), '998995000001'));
+    expect(lastText(t.calls, tg(1))).toContain('allaqachon ishlatilgan');
+  });
 });

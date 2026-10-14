@@ -4,6 +4,7 @@ import {
   RiCalendarLine,
   RiCheckLine,
   RiCoupon3Line,
+  RiDeleteBinLine,
   RiFileCopyLine,
   RiForbidLine,
   RiMore2Fill,
@@ -178,6 +179,7 @@ export default function ParticipantPage() {
   } = useLoad(() => adminApi<Detail>(`/participants/${id}`), [id]);
   const [busy, setBusy] = useState(false);
   const [blockOpen, setBlockOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const name = p ? [p.firstName, p.lastName].filter(Boolean).join(' ') : '';
   usePageHeader(
@@ -214,6 +216,20 @@ export default function ParticipantPage() {
   };
 
   const isAdmin = can(me, 'participants.edit');
+  // O'chirish qaytarib bo'lmaydi — faqat ADMIN roli
+  const canDelete = me.role === 'ADMIN';
+
+  const remove = async () => {
+    setBusy(true);
+    try {
+      const r = await adminApi<{ coupons: number; receipts: number }>(`/participants/${p.id}`, { method: 'DELETE' });
+      toast.success(`${who} o'chirildi (${r.coupons} kupon, ${r.receipts} chek)`);
+      router.replace('/admin/participants');
+    } catch (e) {
+      toast.error((e as Error).message);
+      setBusy(false);
+    }
+  };
   const who = p.phone ?? (name || `#${p.id}`);
   const openReceipt = (rid: number) => router.push(`/admin/receipts/${rid}`);
 
@@ -340,6 +356,12 @@ export default function ParticipantPage() {
                     {p.isBlocked ? <RiShieldCheckLine /> : <RiForbidLine />}
                     {p.isBlocked ? 'Blokdan chiqarish' : 'Bloklash'}
                   </DropdownMenuItem>
+                  {canDelete && (
+                    <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
+                      <RiDeleteBinLine />
+                      O&apos;chirish
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -379,6 +401,27 @@ export default function ParticipantPage() {
                 }
               >
                 {p.isBlocked ? 'Blokdan chiqarish' : 'Bloklash'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {canDelete && (
+        <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{who} butunlay o&apos;chirilsinmi?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Barcha cheklari va {p.coupons.eligible + p.coupons.ineligible} ta kuponi o&apos;chadi, qaytarib bo&apos;lmaydi.
+                U skanerlagan QR&apos;lar qayta ishlamaydi. Shu Telegram akkaunt botga /start bossa — yangidan ro&apos;yxatdan
+                o&apos;tadi.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
+              <AlertDialogAction render={<Button variant="destructive" />} onClick={() => void remove()}>
+                O&apos;chirish
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

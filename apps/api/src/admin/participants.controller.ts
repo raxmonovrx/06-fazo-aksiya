@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { normalizePhone } from '../core/phone.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { AdminGuard, CurrentAdmin, Perm } from './auth.js';
+import { AdminGuard, AdminOnly, CurrentAdmin, Perm } from './auth.js';
 import { AuditService } from './audit.service.js';
 import { parse } from './zod.js';
 
@@ -88,6 +88,37 @@ export class ParticipantsController {
     if (data.isStaff !== undefined) await syncCouponEligibility(this.prisma, [id]);
     await this.audit.log(admin.id, 'participant.update', 'participant', id, data);
     return p;
+  }
+
+  /**
+   * Ishtirokchini butunlay o'chirish (test akkauntlari, mijoz so'rovi). Cheklari va
+   * kuponlari ham o'chadi. U skanerlagan QR'lar qayta ishlatilmaydi — "skanerlangan"
+   * bo'lib qoladi, skanerlagan raqam/ism tarix uchun saqlanadi.
+   * Shu Telegram akkaunt keyin /start bossa — yangi foydalanuvchi sifatida boshlaydi.
+   */
+  @Delete('participants/:id')
+  @AdminOnly()
+  async remove(@Param('id', ParseIntPipe) id: number, @CurrentAdmin() admin: AdminUser) {
+    const p = await this.prisma.participant.findUnique({ where: { id } });
+    if (!p) throw new NotFoundException();
+    const counts = await this.prisma.$transaction(async (tx) => {
+      const receipts = (await tx.receipt.findMany({ where: { participantId: id }, select: { id: true } })).map((r) => r.id);
+      await tx.voucher.updateMany({ where: { OR: [{ redeemedById: id }, { receiptId: { in: receipts } }] }, data: { redeemedById: null, receiptId: null } });
+      const coupons = await tx.coupon.deleteMany({ where: { OR: [{ participantId: id }, { receiptId: { in: receipts } }] } });
+      await tx.notification.deleteMany({ where: { participantId: id } });
+      await tx.scanLog.deleteMany({ where: { participantId: id } });
+      await tx.receipt.deleteMany({ where: { id: { in: receipts } } });
+      await tx.participant.updateMany({ where: { referredById: id }, data: { referredById: null } });
+      await tx.participant.delete({ where: { id } });
+      return { receipts: receipts.length, coupons: coupons.count };
+    });
+    await this.audit.log(admin.id, 'participant.delete', 'participant', id, {
+      tgId: p.tgId.toString(),
+      phone: p.phone,
+      name: [p.firstName, p.lastName].filter(Boolean).join(' ') || p.username,
+      ...counts,
+    });
+    return { ok: true, ...counts };
   }
 
   // ── Xodimlar ───────────────────────────────────────────────────────────
