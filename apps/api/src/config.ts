@@ -29,6 +29,14 @@ export function config(): Config {
     const parsed = schema.safeParse(process.env);
     if (!parsed.success) {
       const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
+console.log('ENV CHECK:', {
+  DATABASE_URL: Boolean(process.env.DATABASE_URL),
+  PUBLIC_URL: Boolean(process.env.PUBLIC_URL),
+  BOT_TOKEN: Boolean(process.env.BOT_TOKEN),
+  BOT_USERNAME: Boolean(process.env.BOT_USERNAME),
+  BOT_WEBHOOK_SECRET: Boolean(process.env.BOT_WEBHOOK_SECRET),
+  JWT_SECRET: Boolean(process.env.JWT_SECRET),
+});
       throw new Error(`.env noto'g'ri:\n${issues}`);
     }
     cached = parsed.data;
