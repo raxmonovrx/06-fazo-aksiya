@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import { ErrorAlert, useLoad } from '@/components/admin/kit';
 import { PageContainer, SettingsSection } from '@/components/admin/layout';
+import { ReferralSettings } from '@/components/admin/referral-settings';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
@@ -380,6 +381,8 @@ export default function SettingsPage() {
           </CardFooter>
         </Card>
       </SettingsSection>
+
+      <ReferralSettings />
     </PageContainer>
   );
 }

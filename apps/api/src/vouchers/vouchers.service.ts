@@ -14,6 +14,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { RateLimiter } from '../receipts/rate-limiter.js';
 import { fmtSum } from '../reconcile/reconcile.service.js';
 import { AlertsService } from '../telegram/alerts.service.js';
+import { ReferralService } from './referral.service.js';
 
 /** Vaucher amal qilish muddati (soat) */
 export const VOUCHER_TTL_HOURS = 72;
@@ -53,6 +54,7 @@ export class VouchersService {
     private readonly prisma: PrismaService,
     private readonly campaigns: CampaignService,
     private readonly alerts: AlertsService,
+    private readonly referral: ReferralService,
   ) {}
 
   // ── Chiqarish (kassir) ─────────────────────────────────────────────────
@@ -255,6 +257,8 @@ export class VouchersService {
     }
 
     void this.fraudChecks(p, v, isStaff, phoneMismatch).catch((e) => this.log.error(e));
+    // Taklif bonusi: do'stning birinchi xaridi — taklif qilganga kupon (xato skanerlashni buzmasin)
+    await this.referral.onFriendRedeemed(p.id, v.branchId, isStaff).catch((e) => this.log.error(e));
     const totalCoupons = await this.prisma.coupon.count({ where: { participantId: p.id, eligible: true } });
     return {
       code: 'REDEEMED',

@@ -22,6 +22,7 @@ import {
   RiUser3Line,
   RiZoomInLine,
   RiZoomOutLine,
+  RiUserAddLine,
 } from '@remixicon/react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -191,6 +192,8 @@ const SOURCE: Record<string, { label: string; icon: typeof RiQrCodeLine }> = {
   QR: { label: 'QR kod', icon: RiQrCodeLine },
   PHOTO: { label: 'Rasm', icon: RiCamera3Line },
   MANUAL: { label: "Qo'lda", icon: RiEditBoxLine },
+  VOUCHER: { label: 'Kassa QR', icon: RiQrCodeLine },
+  REFERRAL: { label: 'Taklif bonusi', icon: RiUserAddLine },
 };
 
 const AUDIT_ACTION: Record<string, string> = {

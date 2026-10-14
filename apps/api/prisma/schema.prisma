@@ -110,6 +110,9 @@ model Participant {
   // matniga rozi bo'lgani — rulesText'ning sha256 boshi (keyin matn o'zgarsa ham isbot)
   rulesAcceptedAt DateTime? @db.Timestamptz(3)
   rulesVersion    String?
+  // Shu do'st (taklif qilingan) uchun taklif bonusi ko'rib chiqilgan vaqt —
+  // bitta do'st uchun bonus faqat bir marta
+  referralBonusAt DateTime? @db.Timestamptz(3)
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 
@@ -130,6 +133,8 @@ enum ReceiptSource {
   MANUAL
   // Kassir chiqargan vaucher QR'i orqali (asosiy oqim, 2026-10-14 dan)
   VOUCHER
+  // Taklif bonusi: taklif qilingan do'st birinchi xaridini qilganda (summasiz yozuv)
+  REFERRAL
 }
 
 enum ReceiptStatus {

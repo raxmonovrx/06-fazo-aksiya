@@ -441,6 +441,14 @@ export function ReceiptsTable({
                             Qo&apos;lda
                           </Badge>
                         )}
+                        {r.source === 'REFERRAL' && (
+                          <Badge
+                            variant="outline"
+                            className="h-4 px-1.5 text-[10px] font-normal text-muted-foreground"
+                          >
+                            Taklif bonusi
+                          </Badge>
+                        )}
                       </div>
                       {r.fm && (
                         <div className="font-mono text-xs text-muted-foreground">

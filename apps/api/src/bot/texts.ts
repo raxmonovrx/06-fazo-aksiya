@@ -33,6 +33,9 @@ export const T = {
     `Kassir bergan QR'ni telefon kamerasi bilan skanerlang — kupon darhol qo'shiladi. ` +
     `Har oy sovg'alar, yil oxirida KIA Sonet avtomobili 🚗`,
 
+  referralHint: (coupons: number) =>
+    `\n\n👥 Do'stingizni taklif qiling: u birinchi xaridini qilsa, sizga <b>+${coupons} kupon</b>.`,
+
   inviteShare: "Fazo'da ovqatlaning, chekdagi QR kodni skanerlang — oylik sovg'alar va yil oxirida KIA Sonet o'yini 🚗",
 
   contact: (support: string) =>

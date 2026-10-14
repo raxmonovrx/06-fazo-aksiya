@@ -9,6 +9,7 @@ import { isRegistered, ParticipantsService, rulesVersionOf } from '../participan
 import { BOT } from '../telegram/bot.token.js';
 import { BTN, T } from './texts.js';
 import { parseVoucherToken } from '../core/voucher-token.js';
+import { ReferralService } from '../vouchers/referral.service.js';
 import { VouchersService } from '../vouchers/vouchers.service.js';
 import { redeemMessage } from '../vouchers/voucher-texts.js';
 
@@ -22,6 +23,7 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
     private readonly participants: ParticipantsService,
     private readonly vouchers: VouchersService,
     private readonly campaigns: CampaignService,
+    private readonly referral: ReferralService,
   ) {}
 
   /** Vaucher QR'ini qo'llaydi va natijani yozadi. */
@@ -61,7 +63,8 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
   async sendHome(ctx: Context, p: Participant) {
     const tmp = await ctx.reply('…', { reply_markup: { remove_keyboard: true } }).catch(() => null);
     if (tmp) await ctx.api.deleteMessage(tmp.chat.id, tmp.message_id).catch(() => undefined);
-    const home = await ctx.reply(T.home(ctx.from?.first_name), {
+    const ref = await this.referral.settings();
+    const home = await ctx.reply(T.home(ctx.from?.first_name) + (ref.enabled ? T.referralHint(ref.couponsPerFriend) : ''), {
       parse_mode: 'HTML',
       link_preview_options: { is_disabled: true },
       reply_markup: this.homeKeyboard(p),

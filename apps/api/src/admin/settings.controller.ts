@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { CampaignService } from '../campaign/campaign.service.js';
 import { tashkentDayStart } from '../core/time.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { ReferralService, referralSettingsSchema } from '../vouchers/referral.service.js';
 import { AdminGuard, CurrentAdmin, Perm } from './auth.js';
 import { AuditService } from './audit.service.js';
 import { BRANCH_ROLES, PERMISSIONS, permissionsOf, ROLE_TEMPLATES, type Permission } from './permissions.js';
@@ -63,6 +64,7 @@ export class SettingsController {
     private readonly prisma: PrismaService,
     private readonly campaigns: CampaignService,
     private readonly audit: AuditService,
+    private readonly referral: ReferralService,
   ) {}
 
   @Get('dashboard')
@@ -119,6 +121,27 @@ export class SettingsController {
     this.campaigns.invalidate();
     await this.audit.log(admin.id, 'campaign.update', 'campaign', c.id, { before: c, after: data });
     return updated;
+  }
+
+  @Get('settings/referral')
+  @Perm('settings')
+  async getReferral() {
+    const [settings, bonus] = await Promise.all([
+      this.referral.settings(),
+      this.prisma.receipt.aggregate({ where: { source: 'REFERRAL' }, _count: { _all: true }, _sum: { couponsCount: true } }),
+    ]);
+    const invited = await this.prisma.participant.count({ where: { referredById: { not: null } } });
+    return { settings, stats: { invited, rewarded: bonus._count._all, coupons: bonus._sum.couponsCount ?? 0 } };
+  }
+
+  @Patch('settings/referral')
+  @Perm('settings')
+  async patchReferral(@Body() body: unknown, @CurrentAdmin() admin: AdminUser) {
+    const before = await this.referral.settings();
+    const data = parse(referralSettingsSchema, { ...before, ...(body as object) });
+    await this.referral.saveSettings(data);
+    await this.audit.log(admin.id, 'settings.referral', 'setting', 'referral', { before, after: data });
+    return data;
   }
 
   @Get('users')

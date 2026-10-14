@@ -14,6 +14,7 @@ const RULES = [
   "3. Kupon soni chek summasiga qarab filial qoidasi bo'yicha beriladi. Har bir QR faqat bir marta ishlaydi.",
   "4. Kuponlar darhol qo'shiladi. Har oy sovg'alar, yil oxirida KIA Sonet avtomobili o'ynaladi.",
   "5. Fazo xodimlari ro'yxatdan o'tishi mumkin, lekin o'yinda qatnashmaydi.",
+  "6. Do'stingiz havolangiz orqali kelib, birinchi xaridini qilsa, sizga 1 bonus kupon beriladi (oyiga ko'pi bilan 10 ta).",
 ].join('\n');
 
 const BRANCHES = [

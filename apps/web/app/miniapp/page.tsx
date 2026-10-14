@@ -309,7 +309,8 @@ export default function MiniApp() {
 // ── Ro'yxat qatori ─────────────────────────────────────────────────────────
 
 function Row({ r }: { r: ReceiptRow }) {
-  const name = r.branch?.name ?? (r.source === 'PHOTO' ? 'Chek rasmi' : 'Chek');
+  const name =
+    r.source === 'REFERRAL' ? "Do'st taklifi" : (r.branch?.name ?? (r.source === 'PHOTO' ? 'Chek rasmi' : 'Chek'));
   const meta = [fmtShort(r.fiscalAt ?? r.createdAt), r.amount && !PENDING.has(r.status) ? `${sum(r.amount)} so'm` : null]
     .filter(Boolean)
     .join(' · ');

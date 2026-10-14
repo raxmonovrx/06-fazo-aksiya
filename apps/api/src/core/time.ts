@@ -35,6 +35,12 @@ export function tashkentDayStart(date: Date): Date {
   );
 }
 
+/** Toshkent bo'yicha oy boshi (UTC Date). */
+export function tashkentMonthStart(date: Date): Date {
+  const local = new Date(date.getTime() + TASHKENT_OFFSET_MS);
+  return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), 1) - TASHKENT_OFFSET_MS);
+}
+
 /** "11.10.2026 20:52" ko'rinishida, Toshkent vaqtida. */
 export function formatTashkent(date: Date, withTime = true): string {
   const l = new Date(date.getTime() + TASHKENT_OFFSET_MS);
