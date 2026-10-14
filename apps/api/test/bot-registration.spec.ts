@@ -36,17 +36,18 @@ describe('Bot: ro\'yxatdan o\'tish', () => {
 
   const lastText = () => [...t.calls].reverse().find((c) => c.method === 'sendMessage')?.payload;
 
-  it('to\'liq oqim: /start src_ → kontakt → roziman → menyu', async () => {
+  it('to\'liq oqim: /start src_ → kontakt (rozilik shu bilan) → menyu', async () => {
     const uid = BASE + 1;
     await t.send(textMessage(uid, '/start src_stol12'));
-    expect(lastText()?.text).toContain('telefon raqamingizni');
-    expect(lastText()?.reply_markup.keyboard[0][0].request_contact).toBe(true);
+    const ask = lastText();
+    expect(ask?.text).toContain('telefon raqamingizni');
+    // Rozilik shu xabarda: qoidalar havolasi bor, alohida "Roziman" yo'q
+    expect(ask?.text).toMatch(/<a href="[^"]+\/rules">qoidalari<\/a>ga/);
+    expect(ask?.reply_markup.keyboard[0][0].request_contact).toBe(true);
 
     await t.send(contactMessage(uid, '998990000001'));
-    expect(lastText()?.reply_markup.inline_keyboard[0][0].callback_data).toBe('rules:accept');
-
-    await t.send(callback(uid, 'rules:accept'));
     expect(lastText()?.text).toContain("Fazo Club'ga xush kelibsiz");
+    expect(t.calls.some((c) => c.payload.reply_markup?.inline_keyboard?.flat().some((b: any) => b.callback_data === 'rules:accept'))).toBe(false);
     // Doimiy klaviatura yo'q — faqat inline tugmalar; eski klaviatura olib tashlanadi
     const buttons = lastText()?.reply_markup.inline_keyboard.flat();
     expect(buttons.map((b: any) => b.text)).toEqual(['👥 Taklif qilish', '☎️ Aloqa']);
@@ -58,6 +59,7 @@ describe('Bot: ro\'yxatdan o\'tish', () => {
     expect(p.source).toBe('stol12');
     expect(p.startPayload).toBe('src_stol12');
     expect(p.rulesAcceptedAt).not.toBeNull();
+    expect(p.rulesVersion).toMatch(/^[0-9a-f]{12}$/);
     expect(p.isStaff).toBe(false);
     expect(p.refCode).toMatch(/^[A-Z2-9]{6}$/);
   });
@@ -102,6 +104,24 @@ describe('Bot: ro\'yxatdan o\'tish', () => {
     const p = await prisma.participant.findUniqueOrThrow({ where: { tgId: BigInt(uid) } });
     expect(p.referredById).toBe(inviter.id);
     expect(p.source).toBe('referral');
+  });
+
+  it('eski oqim: raqam bor, rozilik yo\'q — eski "Roziman" tugmasi ham, /start ham ishlaydi', async () => {
+    const uid = BASE + 8;
+    await t.send(textMessage(uid, '/start'));
+    await prisma.participant.update({ where: { tgId: BigInt(uid) }, data: { phone: '+998990000008' } });
+    await t.send(callback(uid, 'rules:accept'));
+    expect(lastText()?.text).toContain('xush kelibsiz');
+    expect((await prisma.participant.findUniqueOrThrow({ where: { tgId: BigInt(uid) } })).rulesAcceptedAt).not.toBeNull();
+
+    // Raqami bor-u, rozilik bermagan: /start yana raqam so'raydi, yuborsa — tayyor
+    const uid2 = BASE + 9;
+    await t.send(textMessage(uid2, '/start'));
+    await prisma.participant.update({ where: { tgId: BigInt(uid2) }, data: { phone: '+998990000009' } });
+    await t.send(textMessage(uid2, '/start'));
+    expect(lastText()?.reply_markup.keyboard[0][0].request_contact).toBe(true);
+    await t.send(contactMessage(uid2, '+998990000009'));
+    expect(lastText()?.text).toContain('xush kelibsiz');
   });
 
   it('ro\'yxatdan o\'tmagan foydalanuvchi menyudan foydalana olmaydi', async () => {

@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { ROLE_TEMPLATES } from '../src/admin/permissions.js';
 import { signInitData } from '../src/core/init-data.js';
 import { VouchersService } from '../src/vouchers/vouchers.service.js';
-import { callback, contactMessage, createTestApp, textMessage } from './helpers.js';
+import { contactMessage, createTestApp, textMessage } from './helpers.js';
 
 const BASE = 9_500_000_000;
 const TOKEN = process.env.BOT_TOKEN!;
@@ -165,12 +165,15 @@ describe('Vaucherlar (kassir QR)', () => {
     const v = await issue('tv_kassa1', { amount: 200000 });
     const token = await tokenOf(v.id);
     await t.send(textMessage(tg(4), `/start v_${token}`));
-    expect(t.calls.some((c) => c.method === 'sendMessage' && c.payload.chat_id === tg(4) && /QR qabul qilindi/.test(c.payload.text))).toBe(true);
+    // Bitta xabar: kuponlar kutyapti + raqam tugmasi (rozilik shu xabarda)
+    const ask = t.calls.filter((c) => c.method === 'sendMessage' && c.payload.chat_id === tg(4));
+    expect(ask).toHaveLength(1);
+    expect(ask[0].payload.text).toContain('2 ta kupon</b> sizni kutyapti');
+    expect(ask[0].payload.reply_markup.keyboard[0][0].request_contact).toBe(true);
     const p = await prisma.participant.findUniqueOrThrow({ where: { tgId: BigInt(tg(4)) } });
     expect(p).toMatchObject({ pendingVoucher: token, source: 'voucher', startPayload: 'v_' });
 
     await t.send(contactMessage(tg(4), '998995000004'));
-    await t.send(callback(tg(4), 'rules:accept'));
     expect(lastText(t.calls, tg(4))).toContain('+2 kupon');
     const after = await prisma.participant.findUniqueOrThrow({ where: { tgId: BigInt(tg(4)) } });
     expect(after.pendingVoucher).toBeNull();

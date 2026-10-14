@@ -182,6 +182,12 @@ export class VouchersService {
 
   // ── Skanerlash (mijoz) ─────────────────────────────────────────────────
 
+  /** Ro'yxatdan o'tmagan mijozga "N ta kupon kutyapti" deyish uchun (ishlatmaydi) */
+  async peek(token: string): Promise<number | null> {
+    const v = await this.prisma.voucher.findUnique({ where: { token }, select: { status: true, expiresAt: true, couponsCount: true } });
+    return v?.status === 'ISSUED' && v.expiresAt > new Date() ? v.couponsCount : null;
+  }
+
   async redeem(p: Participant, token: string): Promise<RedeemResult> {
     if (p.isBlocked) return { code: 'BLOCKED' };
     if (!this.redeemLimiter.hit(String(p.id))) return { code: 'RATE_LIMIT' };

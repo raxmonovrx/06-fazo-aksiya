@@ -2,7 +2,6 @@
 
 export const BTN = {
   sendPhone: "📱 Raqamni yuborish",
-  agree: '✅ Roziman',
   invite: '👥 Taklif qilish',
   contact: '☎️ Aloqa',
 } as const;
@@ -10,22 +9,24 @@ export const BTN = {
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export const T = {
-  welcome: (name?: string) =>
+  /**
+   * Yagona ro'yxatdan o'tish xabari: raqam so'raladi, rozilik shu yerda —
+   * raqamni yuborish = qoidalarga rozilik (alohida "Roziman" yo'q).
+   */
+  welcome: (name: string | undefined, rulesUrl: string, waitingCoupons: number | null) =>
     `Assalomu alaykum${name ? `, ${esc(name)}` : ''}! 👋\n\n` +
-    `<b>Fazo Club</b> — <b>"Omad Fazosi"</b> aksiyasi.\n` +
-    `Ovqatlan — mashina yut! 🚗\n\n` +
-    `Fazo filiallarida to'lovdan keyin kassir QR beradi — uni skanerlab kupon olasiz. ` +
-    `Har oy sovg'alar, yil oxirida esa avtomobil o'ynaladi.\n\n` +
-    `Boshlash uchun telefon raqamingizni yuboring 👇`,
+    (waitingCoupons
+      ? `🎟 <b>${waitingCoupons} ta kupon</b> sizni kutyapti! Olish uchun telefon raqamingizni yuboring 👇`
+      : `<b>Fazo Club</b> — "Omad Fazosi" aksiyasi. Kassir bergan QR'ni skanerlab kupon olasiz: ` +
+        `har oy sovg'alar, yil oxirida avtomobil 🚗\n\nBoshlash uchun telefon raqamingizni yuboring 👇`) +
+    `\n\n<i>Raqamni yuborish orqali aksiya <a href="${rulesUrl}">qoidalari</a>ga va ma'lumotlaringiz ` +
+    `qayta ishlanishiga rozilik bildirasiz.</i>`,
 
   askPhone: `Telefon raqamingizni yuborish uchun pastdagi tugmani bosing 👇`,
   notOwnPhone: `❗️ Faqat o'zingizning raqamingizni yuboring. Pastdagi tugmani bosing 👇`,
   invalidPhone: `❗️ Faqat O'zbekiston raqami (+998) bilan ro'yxatdan o'tish mumkin.`,
   phoneTaken: (support: string) =>
     `❗️ Bu raqam boshqa Telegram akkauntga bog'langan.` + (support ? `\nAloqa: ${esc(support)}` : ''),
-
-  rulesPrompt: (rulesUrl: string) =>
-    `Rahmat! ✅\n\nAksiyada qatnashish uchun <a href="${rulesUrl}">qoidalar</a> bilan tanishing va rozilik bering.`,
 
   home: (name?: string | null) =>
     `${name ? `${esc(name)}, ` : ''}Fazo Club'ga xush kelibsiz! 🎉\n\n` +

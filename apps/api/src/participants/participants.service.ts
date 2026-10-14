@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto';
+import { createHash, randomInt } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
 import { Prisma, type Participant } from '@prisma/client';
@@ -109,10 +109,11 @@ export class ParticipantsService {
     }
   }
 
-  acceptRules(tgId: number) {
+  /** Rozilik vaqti va qaysi qoidalar matniga rozi bo'lgani (`rulesVersionOf`) */
+  acceptRules(tgId: number, rulesVersion: string | null = null) {
     return this.prisma.participant.update({
       where: { tgId: BigInt(tgId) },
-      data: { rulesAcceptedAt: new Date() },
+      data: { rulesAcceptedAt: new Date(), rulesVersion },
     });
   }
 
@@ -143,6 +144,9 @@ export class ParticipantsService {
     return p.pendingVoucher;
   }
 }
+
+/** Qoidalar matnining qisqa izi — rozilik qaysi matnga berilganini isbotlash uchun */
+export const rulesVersionOf = (rulesText: string) => createHash('sha256').update(rulesText).digest('hex').slice(0, 12);
 
 export const isRegistered = (p: Participant | null): p is Participant =>
   Boolean(p?.phone && p.rulesAcceptedAt);

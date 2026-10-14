@@ -106,7 +106,10 @@ model Participant {
   isBlocked       Boolean   @default(false)
   // Foydalanuvchi botni bloklagan (xabar yetib bormadi)
   botBlockedAt    DateTime? @db.Timestamptz(3)
+  // Rozilik: raqam yuborilganda (qoidalar o'sha xabarda ko'rsatiladi). Qaysi qoidalar
+  // matniga rozi bo'lgani — rulesText'ning sha256 boshi (keyin matn o'zgarsa ham isbot)
   rulesAcceptedAt DateTime? @db.Timestamptz(3)
+  rulesVersion    String?
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 

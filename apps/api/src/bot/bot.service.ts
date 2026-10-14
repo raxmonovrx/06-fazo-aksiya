@@ -1,14 +1,16 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { Bot, Context, InlineKeyboard, Keyboard } from 'grammy';
+
+import { CampaignService } from '../campaign/campaign.service.js';
 import type { Participant } from '@prisma/client';
 
 import { config, isHttps } from '../config.js';
-import { isRegistered, ParticipantsService } from '../participants/participants.service.js';
+import { isRegistered, ParticipantsService, rulesVersionOf } from '../participants/participants.service.js';
 import { BOT } from '../telegram/bot.token.js';
 import { BTN, T } from './texts.js';
 import { parseVoucherToken } from '../core/voucher-token.js';
 import { VouchersService } from '../vouchers/vouchers.service.js';
-import { PENDING_SAVED, redeemMessage } from '../vouchers/voucher-texts.js';
+import { redeemMessage } from '../vouchers/voucher-texts.js';
 
 @Injectable()
 export class BotService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -19,6 +21,7 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
     @Inject(BOT) private readonly bot: Bot,
     private readonly participants: ParticipantsService,
     private readonly vouchers: VouchersService,
+    private readonly campaigns: CampaignService,
   ) {}
 
   /** Vaucher QR'ini qo'llaydi va natijani yozadi. */
@@ -137,19 +140,11 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
       const token = parseVoucherToken(ctx.match);
       const p = await this.participants.startOrGet(ctx.from, ctx.match);
       if (p.isBlocked) return ctx.reply(T.blocked);
-      if (token && !isRegistered(p)) {
-        await this.participants.setPendingVoucher(ctx.from.id, token);
-        await ctx.reply(PENDING_SAVED);
-      }
-      if (token && isRegistered(p)) return this.redeemAndReply(ctx, p, token);
-      if (!p.phone) {
-        return ctx.reply(T.welcome(ctx.from.first_name), {
-          parse_mode: 'HTML',
-          reply_markup: this.phoneKeyboard(),
-        });
-      }
-      if (!p.rulesAcceptedAt) return this.askRules(ctx);
-      return this.sendHome(ctx, p);
+      const pending = token ?? p.pendingVoucher;
+      if (isRegistered(p)) return token ? this.redeemAndReply(ctx, p, token) : this.sendHome(ctx, p);
+      // Ro'yxatdan o'tmagan: QR saqlanadi, bitta xabarda raqam so'raladi (rozilik — shu yerda)
+      if (token) await this.participants.setPendingVoucher(ctx.from.id, token);
+      return this.askPhone(ctx, pending ? await this.vouchers.peek(pending) : null);
     });
 
     pm.on('message:contact', async (ctx) => {
@@ -163,17 +158,19 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
         const text = res.error === 'INVALID_PHONE' ? T.invalidPhone : T.phoneTaken(config().SUPPORT_CONTACT);
         return ctx.reply(text, { parse_mode: 'HTML' });
       }
-      if (res.participant.rulesAcceptedAt) return this.sendHome(ctx, res.participant);
-      return this.askRules(ctx);
+      // Raqam yuborildi — rozilik shu bilan berildi (xabarda qoidalar havolasi bor edi)
+      const p = res.participant.rulesAcceptedAt ? res.participant : await this.acceptRules(ctx.from.id);
+      return this.sendHome(ctx, p);
     });
 
+    // Eski xabarlardagi "Roziman" tugmasi (yangi oqimda yo'q) — ishlashda davom etadi
     bot.callbackQuery('rules:accept', async (ctx) => {
       const p = await this.participants.findByTgId(ctx.from.id);
       if (!p?.phone) {
         await ctx.answerCallbackQuery();
-        return ctx.reply(T.askPhone, { reply_markup: this.phoneKeyboard() });
+        return this.askPhone(ctx, null);
       }
-      const accepted = p.rulesAcceptedAt ? p : await this.participants.acceptRules(ctx.from.id);
+      const accepted = p.rulesAcceptedAt ? p : await this.acceptRules(ctx.from.id);
       await ctx.answerCallbackQuery({ text: '✅' });
       await ctx.editMessageReplyMarkup().catch(() => undefined);
       return this.sendHome(ctx, accepted);
@@ -202,12 +199,17 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
     return new Keyboard().requestContact(BTN.sendPhone).resized().oneTime();
   }
 
-  private askRules(ctx: Context) {
-    return ctx.reply(T.rulesPrompt(this.rulesUrl), {
+  private askPhone(ctx: Context, waitingCoupons: number | null) {
+    return ctx.reply(T.welcome(ctx.from?.first_name, this.rulesUrl, waitingCoupons), {
       parse_mode: 'HTML',
       link_preview_options: { is_disabled: true },
-      reply_markup: new InlineKeyboard().text(BTN.agree, 'rules:accept'),
+      reply_markup: this.phoneKeyboard(),
     });
+  }
+
+  private async acceptRules(tgId: number) {
+    const campaign = await this.campaigns.getActive();
+    return this.participants.acceptRules(tgId, campaign ? rulesVersionOf(campaign.rulesText) : null);
   }
 
   /** Ro'yxatdan o'tgan va bloklanmagan ishtirokchi uchun ishlaydi. */

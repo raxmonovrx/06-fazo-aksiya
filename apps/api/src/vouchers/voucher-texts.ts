@@ -34,4 +34,3 @@ export function redeemMessage(r: RedeemResult): string {
 export const FISCAL_DISABLED =
   `Bu soliq cheki QR'i 🙂\nKupon olish uchun kassirdan <b>Fazo Club QR</b>'ini so'rang va telefon kamerasi bilan skanerlang.`;
 export const PHOTO_NO_QR = `Rasmda Fazo Club QR'i topilmadi.\nKassir bergan QR'ni telefon kamerasi bilan skanerlang.`;
-export const PENDING_SAVED = `QR qabul qilindi ✅ Ro'yxatdan o'tishingiz bilan kuponlar qo'shiladi.`;
