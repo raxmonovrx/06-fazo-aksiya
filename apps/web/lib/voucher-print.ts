@@ -50,7 +50,7 @@ body { margin: 0; width: ${paper}mm; font-family: -apple-system, 'Segoe UI', Rob
 .small { font-size: 10px; margin-top: 1.5mm; }
 </style></head><body><div class="t">
 <div class="brand">FAZO CLUB</div>
-<div class="sub">«Omad Fazosi» aksiyasi</div>
+<div class="sub">Fazo Group</div>
 <div class="hr"></div>
 <div class="big">${v.couponsCount} KUPON</div>
 <div class="row">${esc(v.branchName)} · ${sum(v.amount)} so'm</div>
