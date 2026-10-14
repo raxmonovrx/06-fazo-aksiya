@@ -329,7 +329,8 @@ export class VouchersService {
     }
     if (q.branchId && !actor.branchId) where.branchId = q.branchId;
     if (q.from || q.to) where.issuedAt = { ...(q.from && { gte: q.from }), ...(q.to && { lte: q.to }) };
-    if (q.flagged) where.OR = [{ phoneMismatch: true }, { redeemedByStaff: true }];
+    // Shubhali — xodim skanerlagan. Kassada boshqa raqam aytilgani shubha emas (mijoz bazasi uchun saqlanadi)
+    if (q.flagged) where.redeemedByStaff = true;
     if (q.q?.trim()) {
       const s = q.q.trim();
       const digits = s.replace(/\D/g, '');

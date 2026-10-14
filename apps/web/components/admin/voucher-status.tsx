@@ -55,13 +55,10 @@ export function VoucherStatusBadge({ v, detail = true }: { v: VoucherRow; detail
       {detail && v.status === 'REDEEMED' && (
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
           {fmtPhone(v.redeemedPhone)}
-          {(v.phoneMismatch || v.redeemedByStaff) && (
-            <span
-              className="inline-flex items-center gap-0.5 text-amber-600 dark:text-amber-400"
-              title={v.redeemedByStaff ? 'Xodim skanerlagan' : 'Kassir yozgan raqamdan farq qiladi'}
-            >
+          {v.redeemedByStaff && (
+            <span className="inline-flex items-center gap-0.5 text-amber-600 dark:text-amber-400" title="Xodim skanerlagan">
               <RiAlertLine className="size-3" />
-              {v.redeemedByStaff ? 'xodim' : 'boshqa raqam'}
+              xodim
             </span>
           )}
         </span>

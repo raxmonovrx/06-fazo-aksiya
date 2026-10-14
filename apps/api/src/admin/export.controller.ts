@@ -49,7 +49,9 @@ export class ExportController {
   private async participants(ws: ExcelJS.Worksheet) {
     ws.columns = [
       { header: 'ID', key: 'id', width: 8 },
-      { header: 'Telefon', key: 'phone', width: 16 },
+      { header: 'Telefon (bot)', key: 'phone', width: 16 },
+      { header: 'Kassada aytgan raqam', key: 'kassaPhones', width: 18 },
+      { header: 'Kassada aytgan ism', key: 'kassaNames', width: 18 },
       { header: 'Ism', key: 'firstName', width: 16 },
       { header: 'Familiya', key: 'lastName', width: 16 },
       { header: 'Username', key: 'username', width: 16 },
@@ -65,11 +67,17 @@ export class ExportController {
     ];
     const rows = await this.prisma.participant.findMany({
       orderBy: { id: 'asc' },
-      include: { _count: { select: { receipts: true, coupons: { where: { eligible: true } } } } },
+      include: {
+        _count: { select: { receipts: true, coupons: { where: { eligible: true } } } },
+        vouchers: { select: { customerPhone: true, customerName: true }, orderBy: { redeemedAt: 'desc' } },
+      },
     });
+    const uniq = (xs: Array<string | null>) => [...new Set(xs.filter(Boolean))].join(', ');
     for (const p of rows) {
       ws.addRow({
         ...p,
+        kassaPhones: uniq(p.vouchers.map((v) => v.customerPhone)),
+        kassaNames: uniq(p.vouchers.map((v) => v.customerName)),
         tgId: p.tgId.toString(),
         isStaff: p.isStaff ? 'ha' : '',
         isBlocked: p.isBlocked ? 'ha' : '',
@@ -153,7 +161,7 @@ export class ExportController {
         redeemedName: v.redeemedName ?? '',
         redeemedTgId: v.redeemedTgId?.toString() ?? '',
         redeemedAt: dt(v.redeemedAt),
-        flag: v.redeemedByStaff ? 'xodim' : v.phoneMismatch ? 'boshqa raqam' : '',
+        flag: v.redeemedByStaff ? 'xodim' : '',
         cancelReason: v.cancelReason ?? '',
       });
     }

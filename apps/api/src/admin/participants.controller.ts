@@ -40,7 +40,11 @@ export class ParticipantsController {
         { lastName: { contains: s, mode: 'insensitive' } },
         { username: { contains: s.replace('@', ''), mode: 'insensitive' } },
         { refCode: s.toUpperCase() },
-        ...(digits.length >= 3 ? [{ phone: { contains: digits } }] : []),
+        // Kassada aytilgan ism/raqam bo'yicha ham (QR'dagi yozuv)
+        { vouchers: { some: { customerName: { contains: s, mode: 'insensitive' } } } },
+        ...(digits.length >= 3
+          ? [{ phone: { contains: digits } }, { vouchers: { some: { customerPhone: { contains: digits } } } }]
+          : []),
       ];
     }
     if (q.staff) where.isStaff = q.staff === 'true';
@@ -55,7 +59,34 @@ export class ParticipantsController {
         include: { _count: { select: { receipts: true, coupons: { where: { eligible: true } } } } },
       }),
     ]);
-    return { total, page: q.page, pageSize: q.pageSize, items };
+    const kassa = await this.kassaContacts(items.map((p) => p.id));
+    return {
+      total,
+      page: q.page,
+      pageSize: q.pageSize,
+      items: items.map((p) => ({ ...p, kassaPhones: [...new Set((kassa.get(p.id) ?? []).map((c) => c.phone))] })),
+    };
+  }
+
+  /**
+   * Kassada aytilgan raqam va ism (kassir QR'ga yozgan) — mijoz bazasi uchun botdagi
+   * raqam bilan birga saqlanadi. Bir xil yoki farqli bo'lishi mumkin, bu shubha emas.
+   */
+  private async kassaContacts(participantIds: number[]) {
+    const rows = await this.prisma.voucher.findMany({
+      where: { redeemedById: { in: participantIds }, OR: [{ customerPhone: { not: null } }, { customerName: { not: null } }] },
+      select: { redeemedById: true, customerPhone: true, customerName: true, redeemedAt: true },
+      orderBy: { redeemedAt: 'desc' },
+    });
+    const map = new Map<number, Array<{ phone: string | null; name: string | null; times: number; lastAt: Date | null }>>();
+    for (const r of rows) {
+      const list = map.get(r.redeemedById!) ?? [];
+      const same = list.find((c) => c.phone === r.customerPhone && c.name === r.customerName);
+      if (same) same.times++;
+      else list.push({ phone: r.customerPhone, name: r.customerName, times: 1, lastAt: r.redeemedAt });
+      map.set(r.redeemedById!, list);
+    }
+    return map;
   }
 
   @Get('participants/:id')
@@ -69,9 +100,13 @@ export class ParticipantsController {
       },
     });
     if (!p) throw new NotFoundException();
-    const coupons = await this.prisma.coupon.groupBy({ by: ['eligible'], where: { participantId: id }, _count: { _all: true } });
+    const [coupons, kassa] = await Promise.all([
+      this.prisma.coupon.groupBy({ by: ['eligible'], where: { participantId: id }, _count: { _all: true } }),
+      this.kassaContacts([id]),
+    ]);
     return {
       ...p,
+      kassaContacts: kassa.get(id) ?? [],
       coupons: {
         eligible: coupons.find((c) => c.eligible)?._count._all ?? 0,
         ineligible: coupons.find((c) => !c.eligible)?._count._all ?? 0,

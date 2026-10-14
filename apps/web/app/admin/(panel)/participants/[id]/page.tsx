@@ -79,6 +79,8 @@ interface Detail {
     firstName: string | null;
   } | null;
   _count: { referrals: number };
+  /** Kassada aytilgan raqam va ism (kassir QR'ga yozgan) */
+  kassaContacts: Array<{ phone: string | null; name: string | null; times: number; lastAt: string | null }>;
   coupons: { eligible: number; ineligible: number };
   receipts: Array<{
     id: number;
@@ -492,6 +494,28 @@ export default function ParticipantPage() {
                           label="Referal kodni nusxalash"
                         />
                       </span>
+                    ),
+                  },
+                  {
+                    label: 'Botdagi raqam',
+                    value: p.phone ? <span className="tabular-nums">{fmtPhone(p.phone)}</span> : <span className="text-muted-foreground">—</span>,
+                  },
+                  {
+                    label: 'Kassada aytgan',
+                    value: p.kassaContacts.length ? (
+                      <ul className="grid gap-1">
+                        {p.kassaContacts.map((c, i) => (
+                          <li key={i} className="leading-tight">
+                            <span className="tabular-nums">{c.phone ? fmtPhone(c.phone) : '—'}</span>
+                            {c.phone && c.phone === p.phone && <span className="ml-1.5 text-xs text-muted-foreground">(bir xil)</span>}
+                            <div className="text-xs text-muted-foreground">
+                              {[c.name, c.times > 1 ? `${c.times} marta` : null].filter(Boolean).join(' · ') || ' '}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
                     ),
                   },
                   {

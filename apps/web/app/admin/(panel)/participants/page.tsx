@@ -50,6 +50,8 @@ interface P {
   rulesAcceptedAt: string | null;
   createdAt: string;
   _count: { receipts: number; coupons: number };
+  /** Kassada aytilgan raqam(lar) — kassir QR'ga yozgan */
+  kassaPhones: string[];
 }
 
 const STAFF_OPTIONS = [
@@ -316,6 +318,11 @@ function ParticipantsTable() {
                                 : "kontakt yo'q"
                               : `#${p.id}`}
                           </span>
+                          {p.kassaPhones.some((k) => k !== p.phone) && (
+                            <span className="text-xs text-muted-foreground tabular-nums" title="Kassada aytgan raqam">
+                              kassa: {p.kassaPhones.filter((k) => k !== p.phone).map(fmtPhone).join(', ')}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </TableCell>

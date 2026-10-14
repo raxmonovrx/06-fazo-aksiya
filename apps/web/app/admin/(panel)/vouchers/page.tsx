@@ -108,7 +108,7 @@ export default function VouchersPage() {
 
   return (
     <PageContainer>
-      <PageIntro description="Kassalar chiqargan QR'lar: kim chiqardi, kim skanerladi va qaysi raqam bilan." />
+      <PageIntro description="Kassalar chiqargan QR'lar: kim chiqardi, kassada qaysi raqam aytildi va botda kim skanerladi." />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Chiqarilgan" value={issuedTotal} />
@@ -138,7 +138,7 @@ export default function VouchersPage() {
         <DateRangeFilter from={range.from} to={range.to} onChange={(r) => (setRange(r), setPage(1))} />
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={flagged} onCheckedChange={(v) => (setFlagged(Boolean(v)), setPage(1))} />
-          <RiAlertLine className="size-4 text-amber-600" /> Faqat shubhali
+          <RiAlertLine className="size-4 text-amber-600" /> Faqat xodim skanerlagan
         </label>
         <ResetFilters show={anyFilter} onReset={reset} />
       </DataTableToolbar>
@@ -172,15 +172,15 @@ export default function VouchersPage() {
                 <TableHead>Kassa</TableHead>
                 <TableHead className="text-right">Summa</TableHead>
                 <TableHead className="text-right">Kupon</TableHead>
-                <TableHead>Mijoz (kassir yozgan)</TableHead>
-                <TableHead>Kim skanerladi</TableHead>
+                <TableHead>Kassada aytgan</TableHead>
+                <TableHead>Botda (skanerlagan)</TableHead>
                 <TableHead>Holat</TableHead>
                 {canCancel && <TableHead className="pr-4" />}
               </TableRow>
             </TableHeader>
             <TableBody>
               {data?.items.map((v) => (
-                <TableRow key={v.id} className={cn((v.phoneMismatch || v.redeemedByStaff) && 'bg-amber-500/5')}>
+                <TableRow key={v.id} className={cn(v.redeemedByStaff && 'bg-amber-500/5')}>
                   <TableCell className="pl-4 text-muted-foreground">#{v.id}</TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums">{fmtShort(v.issuedAt)}</TableCell>
                   <TableCell>
@@ -211,10 +211,10 @@ export default function VouchersPage() {
                   </TableCell>
                   <TableCell>
                     <VoucherStatusBadge v={v} detail={v.status !== 'REDEEMED'} />
-                    {(v.phoneMismatch || v.redeemedByStaff) && (
+                    {v.redeemedByStaff && (
                       <div className="mt-0.5 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
                         <RiAlertLine className="size-3" />
-                        {v.redeemedByStaff ? 'Xodim skanerlagan' : 'Boshqa raqam'}
+                        Xodim skanerlagan
                       </div>
                     )}
                   </TableCell>

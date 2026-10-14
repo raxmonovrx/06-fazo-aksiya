@@ -255,7 +255,19 @@ describe('Vaucherlar (kassir QR)', () => {
     expect(all.total).toBeGreaterThan(mine.total);
     expect(all.summary.REDEEMED.count).toBeGreaterThan(0);
     const flagged = await (await api('tv_op', '/vouchers?flagged=true&pageSize=200')).json();
-    expect(flagged.items.every((i: any) => i.phoneMismatch || i.redeemedByStaff)).toBe(true);
+    // «Shubhali» — faqat xodim skanerlagani; kassada boshqa raqam aytilgani shubha emas
+    expect(flagged.items.every((i: any) => i.redeemedByStaff)).toBe(true);
+  });
+
+  it('mijoz bazasi: botdagi va kassada aytilgan raqam ikkalasi ko\'rinadi va qidiriladi', async () => {
+    const p = await prisma.participant.findUniqueOrThrow({ where: { tgId: BigInt(tg(1)) } });
+    // Birinchi test: kassir +998901112233 yozgan, mijoz botda +998995000001 bilan skanerlagan
+    const found = await (await api('tv_admin', '/participants?q=901112233')).json();
+    const row = found.items.find((i: any) => i.id === p.id);
+    expect(row).toMatchObject({ phone: '+998995000001' });
+    expect(row.kassaPhones).toContain('+998901112233');
+    const detail = await (await api('tv_admin', `/participants/${p.id}`)).json();
+    expect(detail.kassaContacts).toEqual(expect.arrayContaining([expect.objectContaining({ phone: '+998901112233' })]));
   });
 
   it('kassa qurilmalari: admin qo\'shadi, kassir faqat o\'z filialinikini ko\'radi va tanlab chiqaradi', async () => {
