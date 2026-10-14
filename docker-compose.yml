@@ -48,7 +48,7 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_BOT_USERNAME: ${BOT_USERNAME:-FazoClub_bot}
+        NEXT_PUBLIC_BOT_USERNAME: ${BOT_USERNAME:-fazogroup_bot}
     restart: unless-stopped
     environment:
       API_URL: http://api:4600

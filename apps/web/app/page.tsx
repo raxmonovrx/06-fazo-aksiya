@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 export default function Home() {
-  const bot = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'FazoClub_bot';
+  const bot = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'fazogroup_bot';
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 p-6 text-center">
       <div className="text-5xl">🚗</div>

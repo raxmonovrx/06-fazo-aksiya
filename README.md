@@ -2,7 +2,7 @@
 
 Kassir admin panelning **Kassa** sahifasida chek summasini kiritadi va bir martalik QR chiqaradi: QR chop etiladi yoki ekranda ko'rsatiladi. Mijoz QR'ni telefon kamerasi bilan skanerlaydi, bot ochiladi va kuponlar darhol qo'shiladi. Tizim mustaqil ishlaydi: iiko, fiskal chek yoki boshqa tizimga bog'liq emas.
 
-- Bot: [@FazoClub_bot](https://t.me/FazoClub_bot)
+- Bot: [@fazogroup_bot](https://t.me/fazogroup_bot)
 - Mini app: `https://club.fazorestaurant.uz/miniapp`
 - Admin panel: `https://club.fazorestaurant.uz/admin`
 - Qoidalar: `https://club.fazorestaurant.uz/rules`
@@ -25,7 +25,7 @@ infra/       nginx konfiguratsiyasi
 
 ## QR qanday ishlaydi
 
-1. Kassir summani kiritadi va terminal tugmasini bosadi. Server tasodifiy token bilan bir martalik QR yaratadi: `t.me/FazoClub_bot?start=v_<token>`. Summa va kupon soni serverda saqlanadi, QR'ni soxtalashtirib bo'lmaydi.
+1. Kassir summani kiritadi va terminal tugmasini bosadi. Server tasodifiy token bilan bir martalik QR yaratadi: `t.me/fazogroup_bot?start=v_<token>`. Summa va kupon soni serverda saqlanadi, QR'ni soxtalashtirib bo'lmaydi.
 2. QR terminal sozlamasiga qarab chop etiladi (80/58 mm termoprinter) yoki ekranda katta ko'rsatiladi. Chekdagi logo va matnlarni admin filial bo'yicha sozlaydi.
 3. Mijoz QR'ni skanerlaydi. Ro'yxatdan o'tmagan bo'lsa, bitta xabarda raqam so'raladi: raqamni yuborish qoidalarga rozilik hisoblanadi. Shundan keyin kuponlar qo'shiladi.
 4. QR bir martalik va aksiya sozlamasidagi muddat (standart 72 soat) ichida amal qiladi. Admin yoki kassir uni bekor qila oladi.
@@ -79,7 +79,7 @@ To'liq ro'yxat [.env.example](.env.example) da. Asosiylari:
 | Nomi | Izoh |
 |---|---|
 | `PUBLIC_URL` | `https://club.fazorestaurant.uz`. Mini app, webhook va qoidalar havolasi shundan yasaladi |
-| `BOT_TOKEN`, `BOT_USERNAME` | @FazoClub_bot |
+| `BOT_TOKEN`, `BOT_USERNAME` | @fazogroup_bot |
 | `BOT_MODE` | `webhook` (prod), `polling` (lokal), `off` |
 | `BOT_WEBHOOK_SECRET` | Telegram webhook sarlavhasi uchun. Yaratish: `openssl rand -hex 24` |
 | `ADMIN_ALERT_CHAT_ID` | "Fazo Group \| Alert" guruhi. Guruhga `/chatid` yozib bilib olinadi |

@@ -51,7 +51,7 @@ interface Sheet {
   rescan?: boolean;
 }
 
-const BOT = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'FazoClub_bot';
+const BOT = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'fazogroup_bot';
 const BRAND = '#C8102E';
 const NO_SCANNER = new Set(['tdesktop', 'macos', 'web', 'weba', 'webk', 'unknown']);
 const MOBILE = new Set(['ios', 'android', 'android_x']);
