@@ -1,8 +1,12 @@
 'use client';
 
 import {
+  RiCheckLine,
   RiKey2Line,
   RiLoader4Line,
+  RiMore2Fill,
+  RiShieldUserLine,
+  RiTeamLine,
   RiUserAddLine,
   RiUserFollowLine,
   RiUserForbidLine,
@@ -10,12 +14,14 @@ import {
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { DataTableCard } from '@/components/admin/data-table';
+import { ErrorAlert, TableLoading, useLoad } from '@/components/admin/kit';
 import {
-  ErrorAlert,
-  TableEmpty,
-  TableLoading,
-  useLoad,
-} from '@/components/admin/kit';
+  Dot,
+  EmptyState,
+  PageContainer,
+  SettingsSection,
+} from '@/components/admin/layout';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -25,17 +31,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
 import {
   Dialog,
@@ -46,12 +45,34 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+  InputGroupTextarea,
+} from '@/components/ui/input-group';
 import { PasswordInput } from '@/components/ui/password-input';
 import {
   Select,
@@ -60,6 +81,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -68,9 +90,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
 import { adminApi } from '@/lib/api';
 import { fmtDate } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { useAdmin } from '../admin-context';
 
 interface Campaign {
@@ -81,18 +103,32 @@ interface Campaign {
   receiptWindowHours: number;
   rulesText: string;
 }
+type Role = 'ADMIN' | 'OPERATOR';
 interface User {
   id: number;
   login: string;
-  role: 'ADMIN' | 'OPERATOR';
+  role: Role;
   isActive: boolean;
   createdAt: string;
 }
 
-const ROLES = [
-  { value: 'OPERATOR', label: 'Operator' },
-  { value: 'ADMIN', label: 'Admin' },
+const ROLES: Array<{ value: Role; label: string; description: string }> = [
+  {
+    value: 'OPERATOR',
+    label: 'Operator',
+    description: 'Cheklar, moderatsiya va ishtirokchilar bilan ishlaydi',
+  },
+  {
+    value: 'ADMIN',
+    label: 'Admin',
+    description: "To'liq kirish: sozlamalar, filiallar, import, adminlar",
+  },
 ];
+const roleLabel = (r: Role) => (r === 'ADMIN' ? 'Admin' : 'Operator');
+
+const RULES_MAX = 20_000;
+const WINDOW_MAX = 24 * 30;
+const LOGIN_RE = /^[a-z0-9._-]{3,32}$/i;
 
 // DateTimePicker qiymati (YYYY-MM-DDTHH:mm) Toshkent vaqti sifatida
 const toLocal = (iso: string | null) =>
@@ -103,40 +139,185 @@ const toLocal = (iso: string | null) =>
     : '';
 const fromLocal = (v: string) => (v ? `${v}:00+05:00` : null);
 
-const EMPTY_USER = { login: '', password: '', role: 'OPERATOR' };
+type General = {
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  receiptWindowHours: string;
+};
+const generalOf = (c: Campaign): General => ({
+  name: c.name,
+  startsAt: toLocal(c.startsAt),
+  endsAt: toLocal(c.endsAt),
+  receiptWindowHours: String(c.receiptWindowHours),
+});
+const sameGeneral = (a: General, b: General) =>
+  a.name === b.name &&
+  a.startsAt === b.startsAt &&
+  a.endsAt === b.endsAt &&
+  a.receiptWindowHours === b.receiptWindowHours;
+
+const EMPTY_GENERAL: General = {
+  name: '',
+  startsAt: '',
+  endsAt: '',
+  receiptWindowHours: '',
+};
+const EMPTY_USER = { login: '', password: '', role: 'OPERATOR' as Role };
+
+const num = (n: number) => n.toLocaleString('ru-RU').replace(/\s/g, ' ');
+
+/** Login → avatar uchun 1–2 harf */
+const initials = (login: string) => {
+  const parts = login.split(/[._-]+/).filter(Boolean);
+  const s = parts.length > 1 ? parts[0][0] + parts[1][0] : login.slice(0, 2);
+  return s.toUpperCase();
+};
+
+/** Parol kuchi — oddiy taxmin (uzunlik + belgi turlari) */
+function passwordStrength(p: string) {
+  if (!p) return null;
+  if (p.length < 8)
+    return { level: 0, label: `Yana ${8 - p.length} ta belgi kerak` };
+  const kinds = [/[a-z]/, /[A-Z]/, /\d/, /[^a-zA-Z0-9]/].filter((r) =>
+    r.test(p),
+  ).length;
+  const score = kinds + (p.length >= 12 ? 1 : 0);
+  if (score >= 4) return { level: 3, label: 'Kuchli parol' };
+  if (score >= 3) return { level: 2, label: "O'rtacha parol" };
+  return { level: 1, label: 'Zaif — harf, raqam va belgini aralashtiring' };
+}
+
+function StrengthHint({ password }: { password: string }) {
+  const s = passwordStrength(password);
+  if (!s) return <FieldDescription>Kamida 8 belgi</FieldDescription>;
+  const color = ['bg-red-500', 'bg-amber-500', 'bg-sky-500', 'bg-emerald-500'][
+    s.level
+  ];
+  return (
+    <div className="grid gap-1.5">
+      <div className="grid grid-cols-3 gap-1" aria-hidden>
+        {[1, 2, 3].map((i) => (
+          <span
+            key={i}
+            className={cn(
+              'h-1 rounded-full',
+              s.level >= i || (s.level === 0 && i === 1) ? color : 'bg-muted',
+            )}
+          />
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">{s.label}</p>
+    </div>
+  );
+}
+
+function SaveButton({
+  busy,
+  disabled,
+  form,
+}: {
+  busy: boolean;
+  disabled: boolean;
+  form: string;
+}) {
+  return (
+    <Button type="submit" size="sm" form={form} disabled={busy || disabled}>
+      {busy && (
+        <RiLoader4Line data-icon="inline-start" className="animate-spin" />
+      )}
+      Saqlash
+    </Button>
+  );
+}
 
 export default function SettingsPage() {
   const me = useAdmin();
   const campaign = useLoad(() => adminApi<Campaign>('/settings/campaign'), []);
   const users = useLoad(() => adminApi<User[]>('/users'), []);
-  const [f, setF] = useState({
-    name: '',
-    startsAt: '',
-    endsAt: '',
-    receiptWindowHours: '72',
-    rulesText: '',
-  });
-  const [nu, setNu] = useState(EMPTY_USER);
+
+  const [gen, setGen] = useState<General>(EMPTY_GENERAL);
+  const [rules, setRules] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [nu, setNu] = useState(EMPTY_USER);
   const [toggleUser, setToggleUser] = useState<User | null>(null);
   const [pwUser, setPwUser] = useState<User | null>(null);
   const [newPw, setNewPw] = useState('');
 
+  // Birinchi yuklanishda formalarni to'ldiramiz. Keyin har bir bo'lim
+  // faqat o'zi saqlanganda yangilanadi — boshqa bo'limdagi tahrir yo'qolmaydi.
+  const [inited, setInited] = useState(false);
   useEffect(() => {
     const c = campaign.data;
-    if (c)
-      setF({
-        name: c.name,
-        startsAt: toLocal(c.startsAt),
-        endsAt: toLocal(c.endsAt),
-        receiptWindowHours: String(c.receiptWindowHours),
-        rulesText: c.rulesText,
-      });
-  }, [campaign.data]);
+    if (c && !inited) {
+      setGen(generalOf(c));
+      setRules(c.rulesText);
+      setInited(true);
+    }
+  }, [campaign.data, inited]);
 
-  /** Amalni bajaradi; muvaffaqiyatda toast + qayta yuklash, true qaytaradi */
-  const run = async (
+  const c = campaign.data;
+  const genDirty = !!c && !sameGeneral(gen, generalOf(c));
+  const rulesDirty = !!c && rules !== c.rulesText;
+
+  // Aksiya bo'limi tekshiruvi
+  const hours = Number(gen.receiptWindowHours);
+  const windowErr =
+    !gen.receiptWindowHours ||
+    !Number.isInteger(hours) ||
+    hours < 1 ||
+    hours > WINDOW_MAX
+      ? `1 dan ${WINDOW_MAX} gacha butun son`
+      : null;
+  const nameErr = !gen.name.trim() ? 'Nomini kiriting' : null;
+  const startErr = !gen.startsAt ? 'Boshlanish vaqtini tanlang' : null;
+  const endErr =
+    gen.endsAt && gen.startsAt && gen.endsAt <= gen.startsAt
+      ? 'Tugash boshlanishdan keyin bo‘lsin'
+      : null;
+  const genInvalid = !!(windowErr || nameErr || startErr || endErr);
+  const rulesInvalid = rules.length > RULES_MAX;
+
+  /** Kampaniyani qisman saqlaydi (API barcha maydonlarni ixtiyoriy qabul qiladi) */
+  const patchCampaign = async (
+    key: string,
+    json: Partial<Record<keyof Campaign, unknown>>,
+    after: (u: Campaign) => void,
+  ) => {
+    setBusy(key);
+    try {
+      const updated = await adminApi<Campaign>('/settings/campaign', {
+        method: 'PATCH',
+        json,
+      });
+      campaign.setData(updated);
+      after(updated);
+      toast.success('Saqlandi');
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveGeneral = () =>
+    patchCampaign(
+      'general',
+      {
+        name: gen.name.trim(),
+        startsAt: fromLocal(gen.startsAt),
+        endsAt: fromLocal(gen.endsAt),
+        receiptWindowHours: hours,
+      },
+      (u) => setGen(generalOf(u)),
+    );
+
+  const saveRules = () =>
+    patchCampaign('rules', { rulesText: rules }, (u) => setRules(u.rulesText));
+
+  /** Foydalanuvchi amali; muvaffaqiyatda toast + ro'yxatni yangilash */
+  const runUser = async (
     key: string,
     fn: () => Promise<unknown>,
     ok: string,
@@ -145,7 +326,7 @@ export default function SettingsPage() {
     try {
       await fn();
       toast.success(ok);
-      await Promise.all([campaign.reload(), users.reload()]);
+      await users.reload();
       return true;
     } catch (e) {
       toast.error((e as Error).message);
@@ -155,236 +336,447 @@ export default function SettingsPage() {
     }
   };
 
-  const saveCampaign = () =>
-    run(
-      'campaign',
-      () =>
-        adminApi('/settings/campaign', {
-          method: 'PATCH',
-          json: {
-            name: f.name,
-            startsAt: fromLocal(f.startsAt),
-            endsAt: fromLocal(f.endsAt),
-            receiptWindowHours: Number(f.receiptWindowHours),
-            rulesText: f.rulesText,
-          },
-        }),
-      'Aksiya sozlamalari saqlandi',
+  const patchUser = (u: User, json: Record<string, unknown>, ok: string) =>
+    runUser(
+      `user-${u.id}`,
+      () => adminApi(`/users/${u.id}`, { method: 'PATCH', json }),
+      ok,
     );
 
-  const toggleActive = (u: User) =>
-    run(
-      `toggle-${u.id}`,
-      () =>
-        adminApi(`/users/${u.id}`, {
-          method: 'PATCH',
-          json: { isActive: !u.isActive },
-        }),
-      'Saqlandi',
-    );
+  const nuLoginErr =
+    nu.login && !LOGIN_RE.test(nu.login.trim())
+      ? '3–32 belgi: lotin harf, raqam, . _ -'
+      : null;
+  const nuValid =
+    LOGIN_RE.test(nu.login.trim()) && nu.password.length >= 8 && !!nu.role;
 
   return (
-    <div className="flex flex-col gap-4">
-      <ErrorAlert error={campaign.error ?? users.error} />
+    <PageContainer size="narrow" className="gap-8">
+      <ErrorAlert error={campaign.error} />
 
-      {/* Aksiya sozlamalari */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Aksiya</CardTitle>
-          <CardDescription>
-            Aksiya muddati, chek qabul qilish oynasi va qoidalar matni
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form
-            id="campaign-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void saveCampaign();
-            }}
-          >
-            <FieldGroup>
-              <div className="grid gap-5 md:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor="c-name">Nomi</FieldLabel>
-                  <Input
-                    id="c-name"
-                    value={f.name}
-                    onChange={(e) => setF({ ...f, name: e.target.value })}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="c-window">Chek oynasi (soat)</FieldLabel>
-                  <Input
-                    id="c-window"
-                    value={f.receiptWindowHours}
-                    onChange={(e) =>
-                      setF({ ...f, receiptWindowHours: e.target.value })
-                    }
-                    inputMode="numeric"
-                  />
-                  <FieldDescription>
-                    Chek shu vaqt ichida qo&apos;shilishi kerak
-                  </FieldDescription>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="c-start">
-                    Boshlanishi (Toshkent)
-                  </FieldLabel>
-                  <DateTimePicker
-                    id="c-start"
-                    value={f.startsAt}
-                    onChange={(v) => setF({ ...f, startsAt: v })}
-                  />
-                  <FieldDescription>
-                    Bundan oldingi cheklar qabul qilinmaydi
-                  </FieldDescription>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="c-end">Tugashi (ixtiyoriy)</FieldLabel>
-                  <DateTimePicker
-                    id="c-end"
-                    value={f.endsAt}
-                    onChange={(v) => setF({ ...f, endsAt: v })}
-                    defaultTime="23:59"
-                    clearable
-                  />
-                  <FieldDescription>
-                    Bo&apos;sh qoldirilsa — muddatsiz
-                  </FieldDescription>
-                </Field>
-              </div>
-              <Field>
-                <FieldLabel htmlFor="c-rules">Qoidalar matni</FieldLabel>
-                <Textarea
-                  id="c-rules"
-                  rows={10}
-                  value={f.rulesText}
-                  onChange={(e) => setF({ ...f, rulesText: e.target.value })}
-                />
-                <FieldDescription>
-                  Bot va mini app&apos;da ko&apos;rinadi
-                </FieldDescription>
-              </Field>
-            </FieldGroup>
-          </form>
-        </CardContent>
-        <CardFooter className="justify-end">
-          <Button
-            type="submit"
-            form="campaign-form"
-            disabled={busy === 'campaign' || !campaign.data}
-          >
-            {busy === 'campaign' && (
-              <RiLoader4Line
-                data-icon="inline-start"
-                className="animate-spin"
-              />
+      {/* ——— Aksiya ——— */}
+      <SettingsSection
+        title="Aksiya"
+        description="Aksiya nomi, muddati va chek qabul qilinadigan vaqt oralig'i."
+      >
+        <Card>
+          <CardContent>
+            {!c && !campaign.error ? (
+              <FormSkeleton />
+            ) : (
+              <form
+                id="general-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (genDirty && !genInvalid) void saveGeneral();
+                }}
+              >
+                <FieldGroup className="gap-5">
+                  <Field data-invalid={!!nameErr || undefined}>
+                    <FieldLabel htmlFor="c-name">Nomi</FieldLabel>
+                    <Input
+                      id="c-name"
+                      value={gen.name}
+                      maxLength={100}
+                      aria-invalid={!!nameErr || undefined}
+                      onChange={(e) => setGen({ ...gen, name: e.target.value })}
+                    />
+                    {nameErr && <FieldError>{nameErr}</FieldError>}
+                  </Field>
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <Field data-invalid={!!startErr || undefined}>
+                      <FieldLabel htmlFor="c-start">Boshlanishi</FieldLabel>
+                      <DateTimePicker
+                        id="c-start"
+                        value={gen.startsAt}
+                        onChange={(v) => setGen({ ...gen, startsAt: v })}
+                      />
+                      {startErr ? (
+                        <FieldError>{startErr}</FieldError>
+                      ) : (
+                        <FieldDescription>
+                          Bundan oldingi cheklar qabul qilinmaydi
+                        </FieldDescription>
+                      )}
+                    </Field>
+                    <Field data-invalid={!!endErr || undefined}>
+                      <FieldLabel htmlFor="c-end">Tugashi</FieldLabel>
+                      <DateTimePicker
+                        id="c-end"
+                        value={gen.endsAt}
+                        onChange={(v) => setGen({ ...gen, endsAt: v })}
+                        defaultTime="23:59"
+                        clearable
+                      />
+                      {endErr ? (
+                        <FieldError>{endErr}</FieldError>
+                      ) : (
+                        <FieldDescription>
+                          Bo&apos;sh bo&apos;lsa — muddatsiz
+                        </FieldDescription>
+                      )}
+                    </Field>
+                  </div>
+
+                  <Field data-invalid={!!windowErr || undefined}>
+                    <FieldLabel htmlFor="c-window">Chek oynasi</FieldLabel>
+                    <InputGroup className="w-full max-w-40">
+                      <InputGroupInput
+                        id="c-window"
+                        value={gen.receiptWindowHours}
+                        inputMode="numeric"
+                        aria-invalid={!!windowErr || undefined}
+                        className="tabular-nums"
+                        onChange={(e) =>
+                          setGen({
+                            ...gen,
+                            receiptWindowHours: e.target.value.replace(
+                              /\D/g,
+                              '',
+                            ),
+                          })
+                        }
+                      />
+                      <InputGroupAddon align="inline-end">
+                        <InputGroupText>soat</InputGroupText>
+                      </InputGroupAddon>
+                    </InputGroup>
+                    {windowErr ? (
+                      <FieldError>{windowErr}</FieldError>
+                    ) : (
+                      <FieldDescription>
+                        Chek xariddan keyin shu vaqt ichida yuborilishi kerak
+                        {hours >= 24 && hours % 24 === 0 && (
+                          <> ({hours / 24} kun)</>
+                        )}
+                      </FieldDescription>
+                    )}
+                  </Field>
+                </FieldGroup>
+              </form>
             )}
-            Saqlash
-          </Button>
-        </CardFooter>
-      </Card>
+          </CardContent>
+          <CardFooter className="justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              Vaqtlar Toshkent bo&apos;yicha (UTC+5)
+            </p>
+            <div className="flex items-center gap-2">
+              {genDirty && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => c && setGen(generalOf(c))}
+                >
+                  Bekor qilish
+                </Button>
+              )}
+              <SaveButton
+                form="general-form"
+                busy={busy === 'general'}
+                disabled={!genDirty || genInvalid}
+              />
+            </div>
+          </CardFooter>
+        </Card>
+      </SettingsSection>
 
-      {/* Admin foydalanuvchilar */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Admin foydalanuvchilar</CardTitle>
-          <CardDescription>
-            Panelga kira oladigan xodimlar, ularning roli va holati
-          </CardDescription>
-          <CardAction>
+      {/* ——— Qoidalar ——— */}
+      <SettingsSection
+        title="Qoidalar matni"
+        description="Ishtirokchi aksiyaga qo'shilishdan oldin shu matnni ko'radi va qabul qiladi."
+      >
+        <Card>
+          <CardContent>
+            {!c && !campaign.error ? (
+              <Skeleton className="h-64 w-full" />
+            ) : (
+              <form
+                id="rules-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (rulesDirty && !rulesInvalid) void saveRules();
+                }}
+              >
+                <Field data-invalid={rulesInvalid || undefined}>
+                  <FieldLabel htmlFor="c-rules" className="sr-only">
+                    Qoidalar matni
+                  </FieldLabel>
+                  <InputGroup>
+                    <InputGroupTextarea
+                      id="c-rules"
+                      rows={12}
+                      value={rules}
+                      aria-invalid={rulesInvalid || undefined}
+                      className="max-h-[480px] min-h-48 resize-y overflow-y-auto leading-relaxed"
+                      onChange={(e) => setRules(e.target.value)}
+                    />
+                    <InputGroupAddon
+                      align="block-end"
+                      className="justify-end border-t"
+                    >
+                      <InputGroupText
+                        className={cn(
+                          'text-xs tabular-nums',
+                          rulesInvalid && 'text-destructive',
+                        )}
+                      >
+                        {num(rules.length)} / {num(RULES_MAX)}
+                      </InputGroupText>
+                    </InputGroupAddon>
+                  </InputGroup>
+                  {rulesInvalid && (
+                    <FieldError>Matn juda uzun — qisqartiring</FieldError>
+                  )}
+                </Field>
+              </form>
+            )}
+          </CardContent>
+          <CardFooter className="justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              Bot va mini app&apos;da ko&apos;rinadi
+            </p>
+            <div className="flex items-center gap-2">
+              {rulesDirty && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => c && setRules(c.rulesText)}
+                >
+                  Bekor qilish
+                </Button>
+              )}
+              <SaveButton
+                form="rules-form"
+                busy={busy === 'rules'}
+                disabled={!rulesDirty || rulesInvalid}
+              />
+            </div>
+          </CardFooter>
+        </Card>
+      </SettingsSection>
+
+      {/* ——— Adminlar ——— */}
+      <SettingsSection
+        title="Adminlar"
+        description={
+          <>
+            Panelga kira oladigan xodimlar.
+            <span className="mt-3 grid gap-2">
+              {ROLES.slice()
+                .reverse()
+                .map((r) => (
+                  <span key={r.value} className="grid gap-0.5">
+                    <span className="text-xs font-medium text-foreground">
+                      {r.label}
+                    </span>
+                    <span className="text-xs">{r.description}</span>
+                  </span>
+                ))}
+            </span>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              {users.data ? (
+                <>
+                  <span className="text-foreground tabular-nums">
+                    {users.data.filter((u) => u.isActive).length}
+                  </span>{' '}
+                  ta faol foydalanuvchi
+                </>
+              ) : (
+                ' '
+              )}
+            </p>
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <RiUserAddLine data-icon="inline-start" />
-              Qo&apos;shish
+              Admin qo&apos;shish
             </Button>
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Login</TableHead>
-                <TableHead>Rol</TableHead>
-                <TableHead>Holat</TableHead>
-                <TableHead>Yaratilgan</TableHead>
-                <TableHead className="text-right">Amallar</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.loading && !users.data && <TableLoading colSpan={5} />}
-              {users.data?.length === 0 && <TableEmpty colSpan={5} />}
-              {users.data?.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-medium">
-                    {u.login}
-                    {u.id === me.id && (
-                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                        (siz)
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={u.role === 'ADMIN' ? 'default' : 'secondary'}
-                    >
-                      {u.role === 'ADMIN' ? 'Admin' : 'Operator'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {u.isActive ? (
-                      <Badge variant="outline">faol</Badge>
-                    ) : (
-                      <Badge variant="destructive">o&apos;chirilgan</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
-                    {fmtDate(u.createdAt)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setNewPw('');
-                          setPwUser(u);
-                        }}
-                      >
-                        <RiKey2Line data-icon="inline-start" />
-                        Parol
-                      </Button>
-                      {u.id !== me.id &&
-                        (u.isActive ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            disabled={busy === `toggle-${u.id}`}
-                            onClick={() => setToggleUser(u)}
-                          >
-                            <RiUserForbidLine data-icon="inline-start" />
-                            O&apos;chirish
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={busy === `toggle-${u.id}`}
-                            onClick={() => void toggleActive(u)}
-                          >
-                            <RiUserFollowLine data-icon="inline-start" />
-                            Yoqish
-                          </Button>
-                        ))}
-                    </div>
-                  </TableCell>
+          </div>
+
+          <ErrorAlert error={users.error} />
+
+          <DataTableCard>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Foydalanuvchi</TableHead>
+                  <TableHead>Rol</TableHead>
+                  <TableHead>Holat</TableHead>
+                  <TableHead className="hidden sm:table-cell">
+                    Qo&apos;shilgan
+                  </TableHead>
+                  <TableHead className="w-10">
+                    <span className="sr-only">Amallar</span>
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {users.loading && !users.data && (
+                  <TableLoading colSpan={5} rows={3} />
+                )}
+                {users.data?.length === 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={5}>
+                      <EmptyState
+                        icon={RiTeamLine}
+                        title="Foydalanuvchi yo'q"
+                        description="Panelga kiradigan birinchi xodimni qo'shing"
+                      />
+                    </TableCell>
+                  </TableRow>
+                )}
+                {users.data?.map((u) => {
+                  const isMe = u.id === me.id;
+                  const rowBusy = busy === `user-${u.id}`;
+                  return (
+                    <TableRow
+                      key={u.id}
+                      className={cn(!u.isActive && 'text-muted-foreground')}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-2.5">
+                          <Avatar size="sm">
+                            <AvatarFallback className="text-[10px] font-medium">
+                              {initials(u.login)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">
+                            {u.login}
+                            {isMe && (
+                              <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                                (siz)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={u.role === 'ADMIN' ? 'secondary' : 'outline'}
+                          className="font-normal"
+                        >
+                          {u.role === 'ADMIN' && <RiShieldUserLine />}
+                          {roleLabel(u.role)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center gap-1.5 text-sm">
+                          <Dot
+                            className={
+                              u.isActive ? 'bg-emerald-500' : 'bg-zinc-400'
+                            }
+                          />
+                          {u.isActive ? 'Faol' : "O'chirilgan"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden whitespace-nowrap text-muted-foreground tabular-nums sm:table-cell">
+                        {fmtDate(u.createdAt, false)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={`${u.login} amallari`}
+                                disabled={rowBusy}
+                              />
+                            }
+                          >
+                            {rowBusy ? (
+                              <RiLoader4Line className="animate-spin" />
+                            ) : (
+                              <RiMore2Fill />
+                            )}
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuGroup>
+                              <DropdownMenuLabel>{u.login}</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setNewPw('');
+                                  setPwUser(u);
+                                }}
+                              >
+                                <RiKey2Line />
+                                Parolni almashtirish
+                              </DropdownMenuItem>
+                              {!isMe && (
+                                <DropdownMenuSub>
+                                  <DropdownMenuSubTrigger>
+                                    <RiShieldUserLine />
+                                    Rol
+                                  </DropdownMenuSubTrigger>
+                                  <DropdownMenuSubContent className="w-40">
+                                    <DropdownMenuRadioGroup
+                                      value={u.role}
+                                      onValueChange={(v) => {
+                                        if (v !== u.role)
+                                          void patchUser(
+                                            u,
+                                            { role: v },
+                                            `Rol: ${roleLabel(v as Role)}`,
+                                          );
+                                      }}
+                                    >
+                                      {ROLES.map((r) => (
+                                        <DropdownMenuRadioItem
+                                          key={r.value}
+                                          value={r.value}
+                                        >
+                                          {r.label}
+                                        </DropdownMenuRadioItem>
+                                      ))}
+                                    </DropdownMenuRadioGroup>
+                                  </DropdownMenuSubContent>
+                                </DropdownMenuSub>
+                              )}
+                            </DropdownMenuGroup>
+                            {!isMe && (
+                              <>
+                                <DropdownMenuSeparator />
+                                {u.isActive ? (
+                                  <DropdownMenuItem
+                                    variant="destructive"
+                                    onClick={() => setToggleUser(u)}
+                                  >
+                                    <RiUserForbidLine />
+                                    O&apos;chirish
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      void patchUser(
+                                        u,
+                                        { isActive: true },
+                                        'Foydalanuvchi yoqildi',
+                                      )
+                                    }
+                                  >
+                                    <RiUserFollowLine />
+                                    Yoqish
+                                  </DropdownMenuItem>
+                                )}
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </DataTableCard>
+        </div>
+      </SettingsSection>
 
       {/* Yangi foydalanuvchi */}
       <Dialog
@@ -396,12 +788,17 @@ export default function SettingsPage() {
       >
         <DialogContent>
           <form
-            className="grid gap-4"
+            className="grid gap-5"
             onSubmit={async (e) => {
               e.preventDefault();
-              const ok = await run(
+              if (!nuValid) return;
+              const ok = await runUser(
                 'add',
-                () => adminApi('/users', { method: 'POST', json: nu }),
+                () =>
+                  adminApi('/users', {
+                    method: 'POST',
+                    json: { ...nu, login: nu.login.trim() },
+                  }),
                 "Foydalanuvchi qo'shildi",
               );
               if (ok) {
@@ -413,19 +810,30 @@ export default function SettingsPage() {
             <DialogHeader>
               <DialogTitle>Admin qo&apos;shish</DialogTitle>
               <DialogDescription>
-                Yangi foydalanuvchi panelga shu login va parol bilan kiradi
+                Xodim panelga shu login va parol bilan kiradi.
               </DialogDescription>
             </DialogHeader>
             <FieldGroup className="gap-4">
-              <Field>
+              <Field data-invalid={!!nuLoginErr || undefined}>
                 <FieldLabel htmlFor="nu-login">Login</FieldLabel>
                 <Input
                   id="nu-login"
                   value={nu.login}
                   onChange={(e) => setNu({ ...nu, login: e.target.value })}
                   autoComplete="off"
-                  required
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder="masalan, aziz.k"
+                  aria-invalid={!!nuLoginErr || undefined}
+                  autoFocus
                 />
+                {nuLoginErr ? (
+                  <FieldError>{nuLoginErr}</FieldError>
+                ) : (
+                  <FieldDescription>
+                    Lotin harf, raqam va . _ - belgilari
+                  </FieldDescription>
+                )}
               </Field>
               <Field>
                 <FieldLabel htmlFor="nu-password">Parol</FieldLabel>
@@ -434,18 +842,16 @@ export default function SettingsPage() {
                   value={nu.password}
                   onChange={(e) => setNu({ ...nu, password: e.target.value })}
                   autoComplete="new-password"
-                  required
-                  minLength={8}
                 />
-                <FieldDescription>Kamida 8 belgi</FieldDescription>
+                <StrengthHint password={nu.password} />
               </Field>
               <Field>
                 <FieldLabel htmlFor="nu-role">Rol</FieldLabel>
                 <Select
                   items={ROLES}
-                  value={nu.role || null}
+                  value={nu.role}
                   onValueChange={(v) =>
-                    setNu({ ...nu, role: (v as string | null) ?? 'OPERATOR' })
+                    setNu({ ...nu, role: (v as Role | null) ?? 'OPERATOR' })
                   }
                 >
                   <SelectTrigger id="nu-role" className="w-full">
@@ -459,6 +865,9 @@ export default function SettingsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                <FieldDescription>
+                  {ROLES.find((r) => r.value === nu.role)?.description}
+                </FieldDescription>
               </Field>
             </FieldGroup>
             <DialogFooter>
@@ -469,12 +878,14 @@ export default function SettingsPage() {
               >
                 Bekor qilish
               </Button>
-              <Button type="submit" disabled={busy === 'add'}>
-                {busy === 'add' && (
+              <Button type="submit" disabled={busy === 'add' || !nuValid}>
+                {busy === 'add' ? (
                   <RiLoader4Line
                     data-icon="inline-start"
                     className="animate-spin"
                   />
+                ) : (
+                  <RiCheckLine data-icon="inline-start" />
                 )}
                 Qo&apos;shish
               </Button>
@@ -492,11 +903,11 @@ export default function SettingsPage() {
       >
         <DialogContent>
           <form
-            className="grid gap-4"
+            className="grid gap-5"
             onSubmit={async (e) => {
               e.preventDefault();
-              if (!pwUser || !newPw) return;
-              const ok = await run(
+              if (!pwUser || newPw.length < 8) return;
+              const ok = await runUser(
                 'password',
                 () =>
                   adminApi(`/users/${pwUser.id}`, {
@@ -509,24 +920,24 @@ export default function SettingsPage() {
             }}
           >
             <DialogHeader>
-              <DialogTitle>Yangi parol</DialogTitle>
+              <DialogTitle>Parolni almashtirish</DialogTitle>
               <DialogDescription>
                 <span className="font-medium text-foreground">
                   {pwUser?.login}
                 </span>{' '}
-                uchun yangi parol (kamida 8 belgi)
+                keyingi kirishda yangi paroldan foydalanadi.
               </DialogDescription>
             </DialogHeader>
             <Field>
-              <FieldLabel htmlFor="pw-new">Parol</FieldLabel>
+              <FieldLabel htmlFor="pw-new">Yangi parol</FieldLabel>
               <PasswordInput
                 id="pw-new"
                 value={newPw}
                 onChange={(e) => setNewPw(e.target.value)}
                 autoComplete="new-password"
                 autoFocus
-                required
               />
+              <StrengthHint password={newPw} />
             </Field>
             <DialogFooter>
               <Button
@@ -536,7 +947,10 @@ export default function SettingsPage() {
               >
                 Bekor qilish
               </Button>
-              <Button type="submit" disabled={busy === 'password' || !newPw}>
+              <Button
+                type="submit"
+                disabled={busy === 'password' || newPw.length < 8}
+              >
                 {busy === 'password' && (
                   <RiLoader4Line
                     data-icon="inline-start"
@@ -576,7 +990,12 @@ export default function SettingsPage() {
               onClick={() => {
                 const u = toggleUser;
                 setToggleUser(null);
-                if (u) void toggleActive(u);
+                if (u)
+                  void patchUser(
+                    u,
+                    { isActive: false },
+                    "Foydalanuvchi o'chirildi",
+                  );
               }}
             >
               O&apos;chirish
@@ -584,6 +1003,29 @@ export default function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </PageContainer>
+  );
+}
+
+function FormSkeleton() {
+  return (
+    <div className="grid gap-5">
+      <div className="grid gap-2">
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-8 w-full" />
+      </div>
+      <div className="grid gap-5 sm:grid-cols-2">
+        {[0, 1].map((i) => (
+          <div key={i} className="grid gap-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-2">
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-8 w-40" />
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { RiMoonLine, RiSunLine } from '@remixicon/react';
 import { useTheme } from 'next-themes';
 
+import { Button } from '@/components/ui/button';
 import { useHydrated } from '@/hooks/use-hydrated';
 import { cn } from '@/lib/utils';
 
@@ -20,8 +21,8 @@ export function ThemeToggle() {
   const hydrated = useHydrated();
   const dark = resolvedTheme === 'dark';
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={() => setTheme(dark ? 'light' : 'dark')}
       className={cn(HEADER_CONTROL, 'w-9')}
       aria-label={dark ? "Yorug' rejimga o'tish" : "Qorong'i rejimga o'tish"}
@@ -33,6 +34,6 @@ export function ThemeToggle() {
         ) : (
           <RiMoonLine className="size-[18px]" />
         ))}
-    </button>
+    </Button>
   );
 }

@@ -1,16 +1,27 @@
 'use client';
 
-import { RiDeleteBinLine, RiUploadLine } from '@remixicon/react';
-import { useState } from 'react';
+import {
+  RiDeleteBinLine,
+  RiLoader4Line,
+  RiMore2Fill,
+  RiSearchLine,
+  RiUploadLine,
+  RiUserStarLine,
+} from '@remixicon/react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
-  ErrorAlert,
-  PageToolbar,
-  TableEmpty,
-  TableLoading,
-  useLoad,
-} from '@/components/admin/kit';
+  DataTableCard,
+  DataTableToolbar,
+  SearchInput,
+} from '@/components/admin/data-table';
+import { ErrorAlert, TableLoading, useLoad } from '@/components/admin/kit';
+import {
+  EmptyState,
+  PageContainer,
+  PageIntro,
+} from '@/components/admin/layout';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,17 +31,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardDescription,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -39,6 +42,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Field,
   FieldContent,
@@ -58,7 +67,7 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { adminApi } from '@/lib/api';
-import { fmtDate } from '@/lib/format';
+import { fmtPhone, fmtShort } from '@/lib/format';
 
 interface Staff {
   phone: string;
@@ -67,9 +76,13 @@ interface Staff {
   createdAt: string;
 }
 
+const digits = (s: string) => s.replace(/\D/g, '');
+
 export default function StaffPage() {
   const list = useLoad(() => adminApi<Staff[]>('/staff'), []);
   const [importing, setImporting] = useState(false);
+  const [q, setQ] = useState('');
+  const [toDelete, setToDelete] = useState<Staff | null>(null);
 
   const remove = async (phone: string) => {
     try {
@@ -83,111 +96,176 @@ export default function StaffPage() {
     }
   };
 
+  // Mijoz tomonida filtr: telefon raqamlari yoki ism bo'yicha
+  const rows = useMemo(() => {
+    const all = list.data ?? [];
+    const s = q.trim().toLowerCase();
+    if (!s) return all;
+    const d = digits(s);
+    return all.filter(
+      (x) =>
+        (d && digits(x.phone).includes(d)) ||
+        (x.name ?? '').toLowerCase().includes(s),
+    );
+  }, [list.data, q]);
+
+  const total = list.data?.length ?? 0;
+  const importBtn = (
+    <Button size="sm" onClick={() => setImporting(true)}>
+      <RiUploadLine data-icon="inline-start" />
+      Import
+    </Button>
+  );
+
   return (
-    <div className="flex flex-col gap-4">
-      <PageToolbar
-        description={
-          <>
-            Ro&apos;yxatdagi telefon bilan ro&apos;yxatdan o&apos;tganlar xodim
-            deb belgilanadi — ular qatnasha oladi, lekin kuponlari o&apos;yinda
-            hisobga olinmaydi.
-          </>
-        }
-      >
-        <Button onClick={() => setImporting(true)}>
-          <RiUploadLine data-icon="inline-start" />
-          CSV / ro&apos;yxat import
-        </Button>
-      </PageToolbar>
+    <PageContainer size="narrow">
+      <PageIntro description="Ro'yxatdagi telefonlar xodim hisoblanadi: qatnasha oladi, lekin o'yinda hisobga olinmaydi." />
 
       <ErrorAlert error={list.error} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Ro&apos;yxat
-            <Badge variant="secondary">{list.data?.length ?? 0}</Badge>
-          </CardTitle>
-          <CardDescription>Xodim deb belgilangan telefonlar</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Telefon</TableHead>
-                <TableHead>Ism</TableHead>
-                <TableHead>Manba</TableHead>
-                <TableHead>Qo&apos;shilgan</TableHead>
-                <TableHead className="w-12" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {list.loading && !list.data && <TableLoading colSpan={5} />}
-              {list.data && !list.data.length && (
-                <TableEmpty colSpan={5}>
-                  Ro&apos;yxat bo&apos;sh — «Import» orqali qo&apos;shing
-                </TableEmpty>
-              )}
-              {list.data?.map((s) => (
-                <TableRow key={s.phone}>
-                  <TableCell className="font-medium tabular-nums">
-                    {s.phone}
-                  </TableCell>
-                  <TableCell>{s.name ?? '—'}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{s.source}</Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {fmtDate(s.createdAt)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <AlertDialog>
-                      <AlertDialogTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label="O'chirish"
-                            className="text-destructive hover:text-destructive"
-                          />
-                        }
-                      >
-                        <RiDeleteBinLine />
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            {s.phone} o&apos;chirilsinmi?
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Bu telefon endi xodim deb hisoblanmaydi.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
-                          <AlertDialogAction
-                            render={<Button variant="destructive" />}
-                            onClick={() => void remove(s.phone)}
-                          >
-                            O&apos;chirish
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </TableCell>
+      {list.data && !total ? (
+        <div className="rounded-xl border bg-card">
+          <EmptyState
+            icon={RiUserStarLine}
+            title="Xodimlar ro'yxati bo'sh"
+            description="CSV fayl yoki telefonlar ro'yxatini import qiling — ular aksiya o'yinidan chetlatiladi."
+            action={importBtn}
+          />
+        </div>
+      ) : (
+        <>
+          <DataTableToolbar actions={importBtn}>
+            <SearchInput
+              value={q}
+              onChange={setQ}
+              placeholder="Telefon yoki ism"
+            />
+            {list.data && (
+              <span className="text-sm text-muted-foreground tabular-nums">
+                {q.trim() ? `${rows.length} / ${total}` : total} ta xodim
+              </span>
+            )}
+          </DataTableToolbar>
+
+          <DataTableCard>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Telefon</TableHead>
+                  <TableHead>Ism</TableHead>
+                  <TableHead className="w-24">Manba</TableHead>
+                  <TableHead className="w-32">Qo&apos;shilgan</TableHead>
+                  <TableHead className="w-12" />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {list.loading && !list.data && <TableLoading colSpan={5} />}
+                {list.data && !rows.length && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={5}>
+                      <EmptyState
+                        className="py-10"
+                        icon={RiSearchLine}
+                        title="Hech narsa topilmadi"
+                        description={`«${q.trim()}» bo'yicha xodim yo'q.`}
+                        action={
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setQ('')}
+                          >
+                            Qidiruvni tozalash
+                          </Button>
+                        }
+                      />
+                    </TableCell>
+                  </TableRow>
+                )}
+                {rows.map((s) => (
+                  <TableRow key={s.phone}>
+                    <TableCell className="font-mono text-xs">
+                      {fmtPhone(s.phone)}
+                    </TableCell>
+                    <TableCell>
+                      {s.name ?? (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-normal">
+                        {s.source}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground tabular-nums">
+                      {fmtShort(s.createdAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label="Amallar"
+                            />
+                          }
+                        >
+                          <RiMore2Fill />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => setToDelete(s)}
+                          >
+                            <RiDeleteBinLine />
+                            O&apos;chirish
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </DataTableCard>
+        </>
+      )}
+
+      <AlertDialog
+        open={!!toDelete}
+        onOpenChange={(o) => {
+          if (!o) setToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {toDelete?.phone} o&apos;chirilsinmi?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu telefon endi xodim deb hisoblanmaydi.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
+            <AlertDialogAction
+              render={<Button variant="destructive" />}
+              onClick={() => {
+                if (toDelete) void remove(toDelete.phone);
+              }}
+            >
+              O&apos;chirish
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ImportDialog
         open={importing}
         onOpenChange={setImporting}
         onDone={() => void list.reload()}
       />
-    </div>
+    </PageContainer>
   );
 }
 
@@ -210,6 +288,8 @@ function ImportDialog({
     setFile(f);
     if (f) setText(await f.text());
   };
+
+  const lines = text.split(/\r?\n/).filter((l) => l.trim()).length;
 
   const submit = async () => {
     setBusy(true);
@@ -237,9 +317,9 @@ function ImportDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>CSV / ro&apos;yxat import</DialogTitle>
+          <DialogTitle>Xodimlarni import qilish</DialogTitle>
           <DialogDescription>
-            Har qatorda: telefon va (ixtiyoriy) ism, nuqtali vergul bilan.
+            Har qatorda telefon va (ixtiyoriy) ism, nuqtali vergul bilan.
           </DialogDescription>
         </DialogHeader>
         <FieldGroup>
@@ -254,11 +334,20 @@ function ImportDialog({
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="staff-text">Ro&apos;yxat</FieldLabel>
+            <div className="flex items-baseline justify-between gap-2">
+              <FieldLabel htmlFor="staff-text">
+                yoki ro&apos;yxatni joylang
+              </FieldLabel>
+              {lines > 0 && (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {lines} qator
+                </span>
+              )}
+            </div>
             <Textarea
               id="staff-text"
               rows={8}
-              className="font-mono text-xs"
+              className="min-h-40 max-h-64 font-mono text-xs"
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={
@@ -266,13 +355,14 @@ function ImportDialog({
               }
             />
           </Field>
-          <Field orientation="horizontal">
+          <Field orientation="horizontal" className="rounded-lg border p-3">
             <FieldContent>
               <FieldLabel htmlFor="staff-replace">
                 Ro&apos;yxatni to&apos;liq almashtirish
               </FieldLabel>
               <FieldDescription>
-                Ishdan ketganlar ro&apos;yxatdan chiqariladi.
+                Yangi ro&apos;yxatda yo&apos;q telefonlar (ishdan ketganlar)
+                o&apos;chiriladi.
               </FieldDescription>
             </FieldContent>
             <Switch
@@ -291,7 +381,14 @@ function ImportDialog({
             Bekor qilish
           </Button>
           <Button disabled={busy || !text.trim()} onClick={() => void submit()}>
-            <RiUploadLine data-icon="inline-start" />
+            {busy ? (
+              <RiLoader4Line
+                data-icon="inline-start"
+                className="animate-spin"
+              />
+            ) : (
+              <RiUploadLine data-icon="inline-start" />
+            )}
             Import
           </Button>
         </DialogFooter>
