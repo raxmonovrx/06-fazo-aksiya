@@ -17,7 +17,7 @@ interface Dashboard {
 export default function DashboardPage() {
   const { data, error } = useLoad(() => adminApi<Dashboard>('/dashboard'), []);
   if (error) return <ErrorBox error={error} />;
-  if (!data) return <p className="text-neutral-400">Yuklanmoqda…</p>;
+  if (!data) return <p className="text-muted-foreground">Yuklanmoqda…</p>;
   const review = (data.receipts.byStatus.NEEDS_REVIEW ?? 0) + (data.receipts.byStatus.NOT_FOUND ?? 0);
   const totalReceipts = Object.values(data.receipts.byStatus).reduce((a, b) => a + b, 0);
 
@@ -30,7 +30,7 @@ export default function DashboardPage() {
         <Stat label="Kuponlar (o'yinda)" value={data.coupons.eligible} sub={`bugun +${data.coupons.today}`} />
         <Stat
           label="Moderatsiya kutmoqda"
-          value={<Link href="/admin/moderation" className={review ? 'text-sky-700 underline' : ''}>{review}</Link>}
+          value={<Link href="/admin/moderation" className={review ? 'text-sky-700 dark:text-sky-400 underline' : ''}>{review}</Link>}
           sub={data.unknownFms ? `noma'lum FM: ${data.unknownFms}` : undefined}
         />
       </div>

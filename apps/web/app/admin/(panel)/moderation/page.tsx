@@ -7,7 +7,7 @@ export default function ModerationPage() {
     <>
       <div>
         <h1 className="text-xl font-bold">Moderatsiya</h1>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-muted-foreground">
           Rasm orqali kelgan (QR o&apos;qilmagan), noma&apos;lum FM, iiko&apos;da topilmagan yoki shubhali cheklar. Chekni ochib, summa va filialni kiritib tasdiqlang yoki sababi bilan rad eting.
         </p>
       </div>

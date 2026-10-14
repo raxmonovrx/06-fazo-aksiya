@@ -67,7 +67,7 @@ function ManualForm({ onDone }: { onDone: () => void }) {
       </form>
       <div className="mt-3 space-y-2">
         <ErrorBox error={error} />
-        {ok && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{ok}</p>}
+        {ok && <p className="rounded-lg bg-emerald-50 dark:bg-emerald-500/15 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">{ok}</p>}
       </div>
     </Card>
   );

@@ -92,8 +92,8 @@ export default function ImportPage() {
           <Button variant="secondary" disabled={busy} onClick={reconcileNow}>🔄 Hozir solishtirish</Button>
         </div>
       </div>
-      {runReport && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Solishtirish: {reportText(runReport)}</p>}
-      {notice && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p>}
+      {runReport && <p className="rounded-lg bg-emerald-50 dark:bg-emerald-500/15 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">Solishtirish: {reportText(runReport)}</p>}
+      {notice && <p className="rounded-lg bg-emerald-50 dark:bg-emerald-500/15 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">{notice}</p>}
       <ErrorBox error={error} />
 
       <Card title="1. iiko hisobotini yuklash (xlsx yoki csv)">
@@ -104,7 +104,7 @@ export default function ImportPage() {
           onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
           className="text-sm"
         />
-        <p className="mt-2 text-xs text-neutral-500">
+        <p className="mt-2 text-xs text-muted-foreground">
           iikoOffice → Отчеты → OLAP-отчет по продажам. Kerakli ustunlar: fiskal chek raqami, FM (yoki kassa), yopilish vaqti, summa. Bir faylni qayta yuklash xavfsiz — takror yozuvlar o&apos;tkazib yuboriladi.
         </p>
       </Card>
@@ -139,7 +139,7 @@ export default function ImportPage() {
           <h3 className="mt-4 mb-2 text-sm font-semibold">Namuna</h3>
           <Table head={preview.headers.map((h, i) => {
             const used = Object.entries(mapping).find(([, v]) => v === i)?.[0];
-            return <span key={i} className={used ? 'text-emerald-700' : ''}>{h}{used && ` ← ${FIELDS.find((f) => f.key === used)?.label.replace(' *', '')}`}</span>;
+            return <span key={i} className={used ? 'text-emerald-700 dark:text-emerald-400' : ''}>{h}{used && ` ← ${FIELDS.find((f) => f.key === used)?.label.replace(' *', '')}`}</span>;
           })}>
             {preview.sample.map((row, i) => (
               <tr key={i}>{preview.headers.map((_, j) => <td key={j} className="whitespace-nowrap">{String(row[j] ?? '')}</td>)}</tr>
@@ -158,7 +158,7 @@ export default function ImportPage() {
             <li>Cheklarga bog&apos;landi: <b>{result.matched}</b></li>
             <li>Solishtirish: {reportText(result.reconcile)}</li>
             {result.errors.length > 0 && (
-              <li className="text-red-700">
+              <li className="text-red-700 dark:text-red-400">
                 O&apos;qilmagan qatorlar ({result.errors.length}): {result.errors.slice(0, 10).map((e) => `${e.row}-qator: ${e.error}`).join('; ')}
               </li>
             )}

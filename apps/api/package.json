@@ -23,6 +23,7 @@
     "@prisma/client": "^6.19",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
+    "dotenv": "^18.0.7",
     "exceljs": "^4.4.0",
     "grammy": "^1.46.0",
     "jsonwebtoken": "^9.0.3",

@@ -36,10 +36,10 @@ export function fmtSum(v: number | string | null | undefined) {
 }
 
 export const STATUS: Record<string, { label: string; cls: string; emoji: string }> = {
-  PENDING: { label: 'Tekshirilmoqda', cls: 'bg-amber-100 text-amber-800', emoji: '⏳' },
-  APPROVED: { label: 'Tasdiqlandi', cls: 'bg-emerald-100 text-emerald-800', emoji: '✅' },
-  BELOW_MIN: { label: 'Summa kam', cls: 'bg-slate-200 text-slate-700', emoji: '➖' },
-  REJECTED: { label: 'Rad etildi', cls: 'bg-red-100 text-red-800', emoji: '❌' },
-  NOT_FOUND: { label: 'Topilmadi', cls: 'bg-orange-100 text-orange-800', emoji: '🔎' },
-  NEEDS_REVIEW: { label: 'Moderatsiyada', cls: 'bg-sky-100 text-sky-800', emoji: '👀' },
+  PENDING: { label: 'Tekshirilmoqda', cls: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300', emoji: '⏳' },
+  APPROVED: { label: 'Tasdiqlandi', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300', emoji: '✅' },
+  BELOW_MIN: { label: 'Summa kam', cls: 'bg-secondary text-secondary-foreground', emoji: '➖' },
+  REJECTED: { label: 'Rad etildi', cls: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300', emoji: '❌' },
+  NOT_FOUND: { label: 'Topilmadi', cls: 'bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300', emoji: '🔎' },
+  NEEDS_REVIEW: { label: 'Moderatsiyada', cls: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300', emoji: '👀' },
 };

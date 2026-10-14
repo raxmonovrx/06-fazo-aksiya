@@ -26,11 +26,11 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-100 p-4">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow">
+    <main className="flex min-h-screen items-center justify-center bg-muted p-4">
+      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-2xl bg-card p-6 shadow">
         <div>
           <h1 className="text-xl font-bold">Fazo Club</h1>
-          <p className="text-sm text-neutral-500">Admin panel</p>
+          <p className="text-sm text-muted-foreground">Admin panel</p>
         </div>
         <Field label="Login">
           <Input value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" autoFocus required />

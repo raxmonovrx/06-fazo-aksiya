@@ -115,8 +115,8 @@ export function ReceiptsTable({ initial, lockStatus, showPhoto }: { initial: Fil
           empty={data?.items.length === 0}
         >
           {data?.items.map((r) => (
-            <tr key={r.id} className="cursor-pointer hover:bg-neutral-50" onClick={() => router.push(`/admin/receipts/${r.id}`)}>
-              <td className="text-neutral-500">
+            <tr key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/admin/receipts/${r.id}`)}>
+              <td className="text-muted-foreground">
                 <Link href={`/admin/receipts/${r.id}`}>#{r.id}</Link>
               </td>
               {showPhoto && (
@@ -125,26 +125,26 @@ export function ReceiptsTable({ initial, lockStatus, showPhoto }: { initial: Fil
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={`/api/admin/photos/${r.photoFileId}`} alt="" className="h-14 w-10 rounded object-cover" loading="lazy" />
                   ) : (
-                    <span className="text-neutral-300">—</span>
+                    <span className="text-muted-foreground">—</span>
                   )}
                 </td>
               )}
               <td className="whitespace-nowrap">{fmtDate(r.createdAt)}</td>
               <td className="whitespace-nowrap">
                 {r.participant.phone}
-                {r.participant.isStaff && <span className="ml-1 rounded bg-neutral-200 px-1 text-xs">xodim</span>}
-                <div className="text-xs text-neutral-400">{[r.participant.firstName, r.participant.lastName].filter(Boolean).join(' ')}</div>
+                {r.participant.isStaff && <span className="ml-1 rounded bg-secondary px-1 text-xs">xodim</span>}
+                <div className="text-xs text-muted-foreground">{[r.participant.firstName, r.participant.lastName].filter(Boolean).join(' ')}</div>
               </td>
-              <td>{r.branch?.name ?? <span className="text-neutral-400">—</span>}</td>
+              <td>{r.branch?.name ?? <span className="text-muted-foreground">—</span>}</td>
               <td className="whitespace-nowrap">
                 {r.receiptNumber ? `№${r.receiptNumber}` : '—'}
-                <div className="text-xs text-neutral-400">{r.fm ?? r.source}</div>
+                <div className="text-xs text-muted-foreground">{r.fm ?? r.source}</div>
               </td>
               <td className="whitespace-nowrap">{fmtDate(r.fiscalAt)}</td>
               <td className="whitespace-nowrap">{fmtSum(r.amount)}</td>
               <td>
                 <StatusBadge status={r.status} />
-                {r.rejectReason && <div className="max-w-48 text-xs text-neutral-500">{r.rejectReason}</div>}
+                {r.rejectReason && <div className="max-w-48 text-xs text-muted-foreground">{r.rejectReason}</div>}
               </td>
               <td className="font-semibold">{r.couponsCount || ''}</td>
             </tr>

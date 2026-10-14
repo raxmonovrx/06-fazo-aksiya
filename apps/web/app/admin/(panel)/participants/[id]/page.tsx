@@ -38,7 +38,7 @@ export default function ParticipantPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   if (error) return <ErrorBox error={error} />;
-  if (!p) return <p className="text-neutral-400">Yuklanmoqda…</p>;
+  if (!p) return <p className="text-muted-foreground">Yuklanmoqda…</p>;
 
   const patch = async (data: Partial<Pick<Detail, 'isBlocked' | 'isStaff'>>) => {
     setBusy(true);
@@ -56,22 +56,22 @@ export default function ParticipantPage() {
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
-        <Link href="/admin/participants" className="text-sm text-neutral-500 hover:underline">← Ishtirokchilar</Link>
+        <Link href="/admin/participants" className="text-sm text-muted-foreground hover:underline">← Ishtirokchilar</Link>
         <h1 className="text-xl font-bold">{p.phone ?? `#${p.id}`}</h1>
-        {p.isStaff && <span className="rounded bg-neutral-200 px-2 text-sm">xodim</span>}
-        {p.isBlocked && <span className="rounded bg-red-100 px-2 text-sm text-red-700">bloklangan</span>}
+        {p.isStaff && <span className="rounded bg-secondary px-2 text-sm">xodim</span>}
+        {p.isBlocked && <span className="rounded bg-red-100 dark:bg-red-500/15 px-2 text-sm text-red-700 dark:text-red-400">bloklangan</span>}
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Profil" className="lg:col-span-2">
           <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
-            <div><dt className="text-xs text-neutral-500">Ism</dt><dd>{[p.firstName, p.lastName].filter(Boolean).join(' ') || '—'}</dd></div>
-            <div><dt className="text-xs text-neutral-500">Telegram</dt><dd>{p.username ? `@${p.username}` : '—'} <span className="text-xs text-neutral-400">{p.tgId}</span></dd></div>
-            <div><dt className="text-xs text-neutral-500">Manba</dt><dd>{p.source ?? '—'} <span className="text-xs text-neutral-400">{p.startPayload}</span></dd></div>
-            <div><dt className="text-xs text-neutral-500">Referal kodi</dt><dd>{p.refCode} · taklif qilganlari: {p._count.referrals}</dd></div>
-            <div><dt className="text-xs text-neutral-500">Kim taklif qilgan</dt><dd>{p.referredBy ? <Link className="text-sky-700" href={`/admin/participants/${p.referredBy.id}`}>{p.referredBy.phone}</Link> : '—'}</dd></div>
-            <div><dt className="text-xs text-neutral-500">Ro&apos;yxatdan o&apos;tgan</dt><dd>{fmtDate(p.rulesAcceptedAt)}</dd></div>
-            <div><dt className="text-xs text-neutral-500">Kuponlar</dt><dd className="font-semibold">{p.coupons.eligible} <span className="text-xs font-normal text-neutral-400">(o&apos;yindan tashqari: {p.coupons.ineligible})</span></dd></div>
-            <div><dt className="text-xs text-neutral-500">Botni bloklagan</dt><dd>{p.botBlockedAt ? fmtDate(p.botBlockedAt) : 'yo\'q'}</dd></div>
+            <div><dt className="text-xs text-muted-foreground">Ism</dt><dd>{[p.firstName, p.lastName].filter(Boolean).join(' ') || '—'}</dd></div>
+            <div><dt className="text-xs text-muted-foreground">Telegram</dt><dd>{p.username ? `@${p.username}` : '—'} <span className="text-xs text-muted-foreground">{p.tgId}</span></dd></div>
+            <div><dt className="text-xs text-muted-foreground">Manba</dt><dd>{p.source ?? '—'} <span className="text-xs text-muted-foreground">{p.startPayload}</span></dd></div>
+            <div><dt className="text-xs text-muted-foreground">Referal kodi</dt><dd>{p.refCode} · taklif qilganlari: {p._count.referrals}</dd></div>
+            <div><dt className="text-xs text-muted-foreground">Kim taklif qilgan</dt><dd>{p.referredBy ? <Link className="text-sky-700 dark:text-sky-400" href={`/admin/participants/${p.referredBy.id}`}>{p.referredBy.phone}</Link> : '—'}</dd></div>
+            <div><dt className="text-xs text-muted-foreground">Ro&apos;yxatdan o&apos;tgan</dt><dd>{fmtDate(p.rulesAcceptedAt)}</dd></div>
+            <div><dt className="text-xs text-muted-foreground">Kuponlar</dt><dd className="font-semibold">{p.coupons.eligible} <span className="text-xs font-normal text-muted-foreground">(o&apos;yindan tashqari: {p.coupons.ineligible})</span></dd></div>
+            <div><dt className="text-xs text-muted-foreground">Botni bloklagan</dt><dd>{p.botBlockedAt ? fmtDate(p.botBlockedAt) : 'yo\'q'}</dd></div>
           </dl>
         </Card>
         {me.role === 'ADMIN' && (
@@ -83,7 +83,7 @@ export default function ParticipantPage() {
               <Button variant="secondary" disabled={busy} onClick={() => patch({ isStaff: !p.isStaff })}>
                 {p.isStaff ? 'Xodim belgisini olib tashlash' : 'Xodim deb belgilash'}
               </Button>
-              <p className="text-xs text-neutral-400">Xodim kuponlari o&apos;yinda qatnashmaydi.</p>
+              <p className="text-xs text-muted-foreground">Xodim kuponlari o&apos;yinda qatnashmaydi.</p>
               <ErrorBox error={actionError} />
             </div>
           </Card>
@@ -93,7 +93,7 @@ export default function ParticipantPage() {
         <Table head={['ID', "Qo'shilgan", 'Filial', 'Chek', 'Chek vaqti', 'Summa', 'Status', 'Kupon']} empty={!p.receipts.length}>
           {p.receipts.map((r) => (
             <tr key={r.id}>
-              <td><Link className="text-sky-700" href={`/admin/receipts/${r.id}`}>#{r.id}</Link></td>
+              <td><Link className="text-sky-700 dark:text-sky-400" href={`/admin/receipts/${r.id}`}>#{r.id}</Link></td>
               <td>{fmtDate(r.createdAt)}</td>
               <td>{r.branch?.name ?? '—'}</td>
               <td>{r.receiptNumber ?? '—'}</td>

@@ -44,11 +44,11 @@ export default function BranchesPage() {
     <>
       <h1 className="text-xl font-bold">Filiallar va kassalar (FM)</h1>
       <ErrorBox error={error ?? branches.error} />
-      {msg && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</p>}
+      {msg && <p className="rounded-lg bg-emerald-50 dark:bg-emerald-500/15 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">{msg}</p>}
 
       {!!unknown.data?.length && (
         <Card title={`⚠️ Noma'lum FM'lar (${unknown.data.length})`}>
-          <p className="mb-3 text-sm text-neutral-500">
+          <p className="mb-3 text-sm text-muted-foreground">
             Shu kassalardan cheklar keldi, lekin ular hech qaysi filialga bog&apos;lanmagan. Filialni tanlang — moderatsiyada kutayotgan cheklar avtomatik qayta ishlanadi.
           </p>
           <Table head={['FM', 'Cheklar', 'Birinchi', 'Oxirgi', 'Filialga bog\'lash']}>
@@ -104,7 +104,7 @@ function BranchCard({ b, run }: { b: Branch; run: (fn: () => Promise<unknown>, o
     <Card
       title={
         <span>
-          {b.name} {!b.isActive && <span className="ml-2 rounded bg-neutral-200 px-2 text-xs">aksiyada emas</span>}
+          {b.name} {!b.isActive && <span className="ml-2 rounded bg-secondary px-2 text-xs">aksiyada emas</span>}
         </span>
       }
     >
@@ -144,7 +144,7 @@ function BranchCard({ b, run }: { b: Branch; run: (fn: () => Promise<unknown>, o
       >
         Saqlash
       </Button>
-      <p className="mt-1 text-xs text-neutral-400">Qoida o&apos;zgarishi faqat keyingi tasdiqlanadigan cheklarga ta&apos;sir qiladi.</p>
+      <p className="mt-1 text-xs text-muted-foreground">Qoida o&apos;zgarishi faqat keyingi tasdiqlanadigan cheklarga ta&apos;sir qiladi.</p>
 
       <h3 className="mt-5 mb-2 text-sm font-semibold">Kassalar (FM raqamlari)</h3>
       <Table head={['FM', 'Yuridik shaxs', 'STIR', 'Izoh', '']} empty={!b.devices.length}>
@@ -157,7 +157,7 @@ function BranchCard({ b, run }: { b: Branch; run: (fn: () => Promise<unknown>, o
             <td className="text-right">
               <Button
                 variant="ghost"
-                className="text-red-600"
+                className="text-red-600 dark:text-red-400"
                 onClick={() => confirm(`${d.fm} o'chirilsinmi?`) && run(() => adminApi(`/devices/${d.id}`, { method: 'DELETE' }), "FM o'chirildi")}
               >
                 O&apos;chirish

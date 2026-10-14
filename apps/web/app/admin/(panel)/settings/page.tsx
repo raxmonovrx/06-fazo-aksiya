@@ -44,7 +44,7 @@ export default function SettingsPage() {
     <>
       <h1 className="text-xl font-bold">Sozlamalar</h1>
       <ErrorBox error={error} />
-      {msg && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</p>}
+      {msg && <p className="rounded-lg bg-emerald-50 dark:bg-emerald-500/15 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">{msg}</p>}
 
       <Card title="Aksiya">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -79,7 +79,7 @@ export default function SettingsPage() {
             <tr key={u.id}>
               <td>{u.login}</td>
               <td>{u.role === 'ADMIN' ? 'Admin' : 'Operator'}</td>
-              <td>{u.isActive ? 'faol' : <span className="text-red-600">o&apos;chirilgan</span>}</td>
+              <td>{u.isActive ? 'faol' : <span className="text-red-600 dark:text-red-400">o&apos;chirilgan</span>}</td>
               <td>{fmtDate(u.createdAt)}</td>
               <td className="space-x-1 text-right">
                 {u.id !== me.id && (

@@ -31,7 +31,7 @@ export default function StaffPage() {
   return (
     <>
       <h1 className="text-xl font-bold">Xodimlar</h1>
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-muted-foreground">
         Ro&apos;yxatdagi telefon bilan ro&apos;yxatdan o&apos;tganlar xodim deb belgilanadi — ular qatnasha oladi, lekin kuponlari o&apos;yinda hisobga olinmaydi.
       </p>
       <Card title="CSV / ro'yxat import">
@@ -57,7 +57,7 @@ export default function StaffPage() {
         </div>
         <div className="mt-3 space-y-2">
           <ErrorBox error={error} />
-          {msg && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</p>}
+          {msg && <p className="rounded-lg bg-emerald-50 dark:bg-emerald-500/15 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">{msg}</p>}
         </div>
       </Card>
       <Card title={`Ro'yxat (${list.data?.length ?? 0})`}>
@@ -69,7 +69,7 @@ export default function StaffPage() {
               <td>{s.source}</td>
               <td>{fmtDate(s.createdAt)}</td>
               <td className="text-right">
-                <Button variant="ghost" className="text-red-600" onClick={() => run(async () => { await adminApi(`/staff/${encodeURIComponent(s.phone)}`, { method: 'DELETE' }); return `${s.phone} o'chirildi`; })}>
+                <Button variant="ghost" className="text-red-600 dark:text-red-400" onClick={() => run(async () => { await adminApi(`/staff/${encodeURIComponent(s.phone)}`, { method: 'DELETE' }); return `${s.phone} o'chirildi`; })}>
                   O&apos;chirish
                 </Button>
               </td>

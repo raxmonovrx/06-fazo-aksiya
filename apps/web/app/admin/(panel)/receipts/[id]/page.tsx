@@ -61,7 +61,7 @@ export default function ReceiptDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   if (error) return <ErrorBox error={error} />;
-  if (!r) return <p className="text-neutral-400">Yuklanmoqda…</p>;
+  if (!r) return <p className="text-muted-foreground">Yuklanmoqda…</p>;
 
   const canApprove = r.status !== 'APPROVED' && r.coupons.length === 0;
   const needIds = !r.fm || !r.receiptNumber;
@@ -97,21 +97,21 @@ export default function ReceiptDetailPage() {
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
-        <Link href="/admin/receipts" className="text-sm text-neutral-500 hover:underline">← Cheklar</Link>
+        <Link href="/admin/receipts" className="text-sm text-muted-foreground hover:underline">← Cheklar</Link>
         <h1 className="text-xl font-bold">Chek #{r.id}</h1>
         <StatusBadge status={r.status} />
-        {r.rejectReason && <span className="text-sm text-neutral-500">{r.rejectReason}</span>}
+        {r.rejectReason && <span className="text-sm text-muted-foreground">{r.rejectReason}</span>}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Ma'lumot" className="lg:col-span-2">
           <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm md:grid-cols-3">
             <Item k="Ishtirokchi">
-              <Link className="text-sky-700 hover:underline" href={`/admin/participants/${r.participant.id}`}>
+              <Link className="text-sky-700 dark:text-sky-400 hover:underline" href={`/admin/participants/${r.participant.id}`}>
                 {r.participant.phone}
               </Link>{' '}
-              {r.participant.isStaff && <span className="rounded bg-neutral-200 px-1 text-xs">xodim</span>}
-              <div className="text-xs text-neutral-400">
+              {r.participant.isStaff && <span className="rounded bg-secondary px-1 text-xs">xodim</span>}
+              <div className="text-xs text-muted-foreground">
                 {[r.participant.firstName, r.participant.lastName].filter(Boolean).join(' ')} {r.participant.username && `@${r.participant.username}`}
               </div>
             </Item>
@@ -125,12 +125,12 @@ export default function ReceiptDetailPage() {
             <Item k="Hal qilingan">{fmtDate(r.decidedAt)} {r.reviewedBy && `(${r.reviewedBy.login})`}</Item>
             <Item k="Summa">{fmtSum(r.amount)}</Item>
             <Item k="Kuponlar">
-              {r.coupons.length ? r.coupons.map((c) => <span key={c.id} className={c.eligible ? '' : 'text-neutral-400 line-through'}>№{c.id} </span>) : '—'}
+              {r.coupons.length ? r.coupons.map((c) => <span key={c.id} className={c.eligible ? '' : 'text-muted-foreground line-through'}>№{c.id} </span>) : '—'}
             </Item>
           </dl>
           {r.rawUrl && (
-            <p className="mt-4 break-all rounded-lg bg-neutral-50 p-2 font-mono text-xs">
-              <a href={r.rawUrl} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline">{r.rawUrl}</a>
+            <p className="mt-4 break-all rounded-lg bg-muted/50 p-2 font-mono text-xs">
+              <a href={r.rawUrl} target="_blank" rel="noreferrer" className="text-sky-700 dark:text-sky-400 hover:underline">{r.rawUrl}</a>
             </p>
           )}
         </Card>
@@ -142,7 +142,7 @@ export default function ReceiptDetailPage() {
               <img src={`/api/admin/photos/${r.photoFileId}`} alt="chek" className="max-h-[480px] w-full rounded-lg object-contain" />
             </a>
           ) : (
-            <p className="text-sm text-neutral-400">Rasm yo&apos;q (QR orqali kelgan)</p>
+            <p className="text-sm text-muted-foreground">Rasm yo&apos;q (QR orqali kelgan)</p>
           )}
         </Card>
       </div>
@@ -175,7 +175,7 @@ export default function ReceiptDetailPage() {
           <Card title="❌ Rad etish">
             <div className="mb-2 flex flex-wrap gap-1">
               {REJECT_PRESETS.map((p) => (
-                <button key={p} onClick={() => setReason(p)} className="rounded-full border px-2 py-0.5 text-xs hover:bg-neutral-50">{p}</button>
+                <button key={p} onClick={() => setReason(p)} className="rounded-full border px-2 py-0.5 text-xs hover:bg-muted/50">{p}</button>
               ))}
             </div>
             <Field label="Sabab (mijozga ko'rinadi)"><Input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
@@ -193,17 +193,17 @@ export default function ReceiptDetailPage() {
             Bog&apos;langan: #{r.saleRecord.id} · {fmtDate(r.saleRecord.closedAt)} · {fmtSum(r.saleRecord.amount)} {r.saleRecord.isRefund && '(qaytarish)'}
           </p>
         )}
-        <p className="mb-2 text-xs text-neutral-500">Shu chek raqami yoki filialda ±30 daqiqa ichida yopilgan cheklar. Qatorni bosing — summa formaga tushadi.</p>
+        <p className="mb-2 text-xs text-muted-foreground">Shu chek raqami yoki filialda ±30 daqiqa ichida yopilgan cheklar. Qatorni bosing — summa formaga tushadi.</p>
         <Table head={['ID', 'Manba', 'FM', 'Chek №', 'Yopilgan', 'Summa', '']} empty={!r.candidates.length}>
           {r.candidates.map((c) => (
-            <tr key={c.id} className="cursor-pointer hover:bg-neutral-50" onClick={() => setAmount(String(Math.round(Number(c.amount))))}>
+            <tr key={c.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setAmount(String(Math.round(Number(c.amount))))}>
               <td>#{c.id}</td>
               <td>{c.source}</td>
               <td>{c.fm ?? '—'}</td>
               <td>{c.receiptNumber ?? '—'}</td>
               <td>{fmtDate(c.closedAt)}</td>
               <td>{fmtSum(c.amount)}</td>
-              <td>{c.isRefund && <span className="text-red-600">qaytarish</span>}</td>
+              <td>{c.isRefund && <span className="text-red-600 dark:text-red-400">qaytarish</span>}</td>
             </tr>
           ))}
         </Table>
@@ -212,11 +212,11 @@ export default function ReceiptDetailPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Audit">
           <ul className="space-y-2 text-sm">
-            {r.audit.length === 0 && <li className="text-neutral-400">Yo&apos;q</li>}
+            {r.audit.length === 0 && <li className="text-muted-foreground">Yo&apos;q</li>}
             {r.audit.map((a) => (
               <li key={a.id}>
-                <span className="text-neutral-500">{fmtDate(a.createdAt)}</span> · <b>{a.action}</b> · {a.actor?.login ?? 'tizim'}
-                <pre className="mt-1 overflow-x-auto rounded bg-neutral-50 p-2 text-xs">{JSON.stringify(a.data, null, 1)}</pre>
+                <span className="text-muted-foreground">{fmtDate(a.createdAt)}</span> · <b>{a.action}</b> · {a.actor?.login ?? 'tizim'}
+                <pre className="mt-1 overflow-x-auto rounded bg-muted/50 p-2 text-xs">{JSON.stringify(a.data, null, 1)}</pre>
               </li>
             ))}
           </ul>
@@ -225,7 +225,7 @@ export default function ReceiptDetailPage() {
           <ul className="space-y-1 text-sm">
             {r.scans.map((s) => (
               <li key={s.id}>
-                <span className="text-neutral-500">{fmtDate(s.createdAt)}</span> · {s.channel} · {s.result}
+                <span className="text-muted-foreground">{fmtDate(s.createdAt)}</span> · {s.channel} · {s.result}
               </li>
             ))}
           </ul>
@@ -238,7 +238,7 @@ export default function ReceiptDetailPage() {
 function Item({ k, children }: { k: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-xs text-neutral-500">{k}</dt>
+      <dt className="text-xs text-muted-foreground">{k}</dt>
       <dd>{children}</dd>
     </div>
   );
