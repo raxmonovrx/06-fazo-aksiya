@@ -141,8 +141,10 @@ export default function CashierPage() {
       ([] as Array<Terminal & { key: string }>),
     [branch],
   );
+  // Terminal yo'q — oddiy «Chop etish» va «Ekranda». Terminallar bor, lekin ekranda ko'rsatadigani
+  // yo'q bo'lsa ham «Ekranda» doim qo'shiladi: printer buzilsa ham QR'ni mijozga ekrandan ko'rsatish mumkin.
   const buttons: Array<{ id: number | null; key: string; name: string; output: TerminalOutput }> = terminals.length
-    ? terminals
+    ? [...terminals, ...(terminals.some((t) => t.output === 'SCREEN') ? [] : [FALLBACK[1]])]
     : FALLBACK;
   const primaryKey = buttons.some((b) => b.key === lastKey) ? lastKey : buttons[0]?.key;
 
