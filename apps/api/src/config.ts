@@ -4,7 +4,8 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(4600),
   DATABASE_URL: z.string().min(1),
-  // Mini app va admin manzili (https://club.fazorestaurant.uz)
+  // Mijozlar manzili: mini app, qoidalar, bot webhook (https://promo.fazorestaurant.uz).
+  // Admin panel — panel.fazorestaurant.uz (nginx), kodda nisbiy manzillar
   PUBLIC_URL: z.string().url(),
   BOT_TOKEN: z.string().min(20),
   BOT_USERNAME: z.string().min(3),

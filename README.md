@@ -3,9 +3,10 @@
 Kassir admin panelning **Kassa** sahifasida chek summasini kiritadi va bir martalik QR chiqaradi: QR chop etiladi yoki ekranda ko'rsatiladi. Mijoz QR'ni telefon kamerasi bilan skanerlaydi, bot ochiladi va kuponlar darhol qo'shiladi. Tizim mustaqil ishlaydi: iiko, fiskal chek yoki boshqa tizimga bog'liq emas.
 
 - Bot: [@fazogroup_bot](https://t.me/fazogroup_bot)
-- Mini app: `https://club.fazorestaurant.uz/miniapp`
-- Admin panel: `https://club.fazorestaurant.uz/admin`
-- Qoidalar: `https://club.fazorestaurant.uz/rules`
+- Mini app: `https://promo.fazorestaurant.uz/miniapp`
+- Admin panel: `https://panel.fazorestaurant.uz/admin`
+- Qoidalar: `https://promo.fazorestaurant.uz/rules`
+- Eski `club.fazorestaurant.uz` yangi manzillarga yo'naltiriladi
 
 Texnik topshiriq [SPEC.md](SPEC.md) da. Infratuzilma konteksti [FAZO_AKSIYA_CONTEXT.md](FAZO_AKSIYA_CONTEXT.md) da.
 
@@ -78,7 +79,7 @@ To'liq ro'yxat [.env.example](.env.example) da. Asosiylari:
 
 | Nomi | Izoh |
 |---|---|
-| `PUBLIC_URL` | `https://club.fazorestaurant.uz`. Mini app, webhook va qoidalar havolasi shundan yasaladi |
+| `PUBLIC_URL` | `https://promo.fazorestaurant.uz`. Mini app, webhook va qoidalar havolasi shundan yasaladi |
 | `BOT_TOKEN`, `BOT_USERNAME` | @fazogroup_bot |
 | `BOT_MODE` | `webhook` (prod), `polling` (lokal), `off` |
 | `BOT_WEBHOOK_SECRET` | Telegram webhook sarlavhasi uchun. Yaratish: `openssl rand -hex 24` |
@@ -110,7 +111,7 @@ Bir martalik tayyorlov:
 3. HTTPS sertifikat oling:
 
    ```bash
-   sudo certbot --nginx -d club.fazorestaurant.uz
+   sudo certbot --nginx -d promo.fazorestaurant.uz -d panel.fazorestaurant.uz -d club.fazorestaurant.uz
    ```
 
 Har safar deploy qilish:
@@ -133,7 +134,7 @@ Bazaga kirish:
 ssh fazo 'cd /opt/fazo-club && docker compose exec postgres psql -U fazo fazo_club'
 ```
 
-RestoBrain admin menyusiga "Fazo Group" tashqi havolasini qo'shing (`https://club.fazorestaurant.uz/admin`). Kirish shu servisning o'z login/paroli bilan bo'ladi.
+RestoBrain admin menyusiga "Fazo Group" tashqi havolasini qo'shing (`https://panel.fazorestaurant.uz/admin`). Kirish shu servisning o'z login/paroli bilan bo'ladi.
 
 ## Admin uchun qisqa qo'llanma
 
