@@ -302,20 +302,26 @@ export default function CashierPage() {
     <div
       className={cn(
         'mx-auto grid w-full grid-cols-[minmax(0,1fr)] gap-4',
-        touch ? 'max-w-[1400px] lg:grid-cols-[minmax(0,1fr)_minmax(420px,520px)]' : 'max-w-6xl lg:grid-cols-[minmax(0,1fr)_380px]',
+        // Sensorli rejim: 640px dan ikki ustun (qurilma masshtabi tufayli ish maydoni ~820px bo'lishi mumkin)
+        touch
+          ? 'max-w-[1400px] gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(300px,350px)] lg:grid-cols-[minmax(0,1fr)_minmax(380px,500px)] tall:gap-4'
+          : 'max-w-6xl lg:grid-cols-[minmax(0,1fr)_380px]',
       )}
     >
       {/* ── Chap: forma va terminallar ─────────────────────────────── */}
       <form
         autoComplete="off"
-        className="flex min-w-0 flex-col gap-4 rounded-2xl border bg-card p-4 shadow-xs md:p-6"
+        className={cn(
+          '@container flex min-w-0 flex-col rounded-2xl border bg-card shadow-xs',
+          touch ? 'gap-2.5 p-3 tall:gap-4 tall:p-5' : 'gap-4 p-4 md:p-6',
+        )}
         onSubmit={(e) => {
           e.preventDefault();
           const btn = buttons.find((b) => b.key === primaryKey);
           if (btn) void issue(btn);
         }}
       >
-        <label className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+        <label className={cn('flex items-center justify-end gap-2 text-sm text-muted-foreground', touch && '-mb-1 tall:mb-0')}>
           <RiKeyboardBoxLine className="size-4" />
           Sensorli klaviatura
           <Switch checked={touch} onCheckedChange={(c) => toggleTouch(Boolean(c))} />
@@ -349,7 +355,8 @@ export default function CashierPage() {
           </label>
           <div
             className={cn(
-              'mt-1.5 flex items-baseline gap-3 rounded-2xl border-2 border-input px-4 py-2 transition-colors focus-within:border-primary',
+              'mt-1 flex items-baseline gap-3 rounded-2xl border-2 border-input px-4 transition-colors focus-within:border-primary',
+              touch ? 'py-0.5 tall:py-2' : 'mt-1.5 py-2',
               touch && active === 'amount' && 'border-primary',
             )}
           >
@@ -361,15 +368,18 @@ export default function CashierPage() {
               onFocus={() => setActive('amount')}
               {...noAutofill('s1')}
               placeholder="0"
-              className="h-16 w-0 min-w-0 flex-1 bg-transparent text-5xl font-bold tabular-nums outline-none placeholder:text-muted-foreground/40 md:h-20 md:text-6xl"
+              className={cn(
+                'w-0 min-w-0 flex-1 bg-transparent font-bold tabular-nums outline-none placeholder:text-muted-foreground/40',
+                touch ? 'h-14 text-4xl tall:h-20 tall:text-6xl' : 'h-16 text-5xl md:h-20 md:text-6xl',
+              )}
               value={groupDigits(onlyDigits(amount))}
               onChange={(e) => setAmount(onlyDigits(e.target.value).slice(0, 10))}
             />
             <span className="text-xl font-medium text-muted-foreground">so&apos;m</span>
           </div>
-          <div className="mt-2 flex min-h-9 items-center gap-3">
+          <div className={cn('flex items-center gap-3', touch ? 'mt-1 min-h-7 tall:mt-2 tall:min-h-9' : 'mt-2 min-h-9')}>
             {coupons ? (
-              <span className="rounded-full bg-emerald-500/15 px-4 py-1.5 text-lg font-semibold text-emerald-700 dark:text-emerald-400">
+              <span className="rounded-full bg-emerald-500/15 px-4 py-1 text-base font-semibold text-emerald-700 tall:py-1.5 tall:text-lg dark:text-emerald-400">
                 {coupons} ta kupon
               </span>
             ) : (
@@ -380,7 +390,7 @@ export default function CashierPage() {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-2 @sm:grid-cols-2 @sm:gap-3">
           <div>
             <label htmlFor="c-p" className="text-sm font-medium text-muted-foreground">
               Mijoz raqami <span className="font-normal">(ixtiyoriy)</span>
@@ -393,7 +403,7 @@ export default function CashierPage() {
               value={phone}
               onChange={setPhone}
               invalid={!phoneOk}
-              className="mt-1.5 h-14 rounded-xl text-xl"
+              className={cn('mt-1 rounded-xl', touch ? 'h-12 text-lg tall:h-14 tall:text-xl' : 'mt-1.5 h-14 text-xl')}
             />
           </div>
           <div>
@@ -406,7 +416,10 @@ export default function CashierPage() {
               inputMode={kbMode}
               onFocus={() => setActive('name')}
               {...noAutofill('n1')}
-              className="mt-1.5 h-14 rounded-xl px-3 text-xl md:text-xl"
+              className={cn(
+                'mt-1 rounded-xl px-3',
+                touch ? 'h-12 text-lg md:text-lg tall:h-14 tall:text-xl md:tall:text-xl' : 'mt-1.5 h-14 text-xl md:text-xl',
+              )}
               value={name}
               maxLength={100}
               onChange={(e) => setName(e.target.value)}
@@ -414,7 +427,7 @@ export default function CashierPage() {
           </div>
         </div>
 
-        {keyboard && <div className="rounded-2xl border bg-background/50 p-3 lg:hidden">{keyboard}</div>}
+        {keyboard && <div className="rounded-2xl border bg-background/50 p-3 sm:hidden">{keyboard}</div>}
 
         {error && (
           <p className="rounded-xl bg-destructive/10 px-4 py-3 text-base font-medium text-destructive">{error}</p>
@@ -438,7 +451,12 @@ export default function CashierPage() {
                   variant={primary ? 'default' : 'outline'}
                   disabled={!ready || busyKey !== null}
                   onClick={() => void issue(b)}
-                  className="h-20 justify-start gap-4 rounded-2xl px-5 text-left [&_svg:not([class*='size-'])]:size-7"
+                  className={cn(
+                    'justify-start rounded-2xl text-left',
+                    touch
+                      ? 'h-16 gap-3 px-4 tall:h-20 tall:gap-4 tall:px-5 [&_svg:not([class*=size-])]:size-6 tall:[&_svg:not([class*=size-])]:size-7'
+                      : "h-20 gap-4 px-5 [&_svg:not([class*='size-'])]:size-7",
+                  )}
                 >
                   {busyKey === b.key ? <RiLoader4Line className="animate-spin" /> : <Icon />}
                   <span className="grid min-w-0 leading-tight">
@@ -463,7 +481,7 @@ export default function CashierPage() {
       {/* ── O'ng: oxirgi QR va bugungi ro'yxat ─────────────────────── */}
       <aside className="flex min-w-0 flex-col gap-4">
         {keyboard && (
-          <div className="sticky top-20 z-10 hidden rounded-2xl border bg-card p-4 shadow-xs lg:block">{keyboard}</div>
+          <div className="sticky top-[4.75rem] z-10 hidden rounded-2xl border bg-card p-3 shadow-xs sm:block tall:p-4">{keyboard}</div>
         )}
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border bg-card p-4">

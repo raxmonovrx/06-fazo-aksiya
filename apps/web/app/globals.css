@@ -3,6 +3,8 @@
 @import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
+/* Baland ekran (≥780px ish maydoni): sensorli kassada katta tugmalar; pastroqda — siqiq */
+@custom-variant tall (@media (min-height: 780px));
 
 /* ── Admin panel mavzusi — restobrain superadmin palitrasi (1:1), faqat
    brend rangi (primary) yashil o'rniga ochroq ko'k. `.dark` ni <html> ga
