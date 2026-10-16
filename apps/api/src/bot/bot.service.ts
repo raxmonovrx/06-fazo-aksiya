@@ -7,7 +7,7 @@ import type { Participant } from '@prisma/client';
 import { config, isHttps } from '../config.js';
 import { isRegistered, ParticipantsService, rulesVersionOf } from '../participants/participants.service.js';
 import { BOT } from '../telegram/bot.token.js';
-import { BTN, T } from './texts.js';
+import { BOT_PROFILE, BTN, T } from './texts.js';
 import { parseVoucherToken } from '../core/voucher-token.js';
 import { ReferralService } from '../vouchers/referral.service.js';
 import { VouchersService } from '../vouchers/vouchers.service.js';
@@ -117,6 +117,15 @@ export class BotService implements OnApplicationBootstrap, OnApplicationShutdown
   private async setupCommands() {
     try {
       await this.bot.api.setMyCommands([{ command: 'start', description: 'Boshlash / menyu' }]);
+      // Faqat o'zgarganda yuboramiz — har restartda bir xil so'rov ketmasin
+      const [{ description }, { short_description }] = await Promise.all([
+        this.bot.api.getMyDescription(),
+        this.bot.api.getMyShortDescription(),
+      ]);
+      if (description !== BOT_PROFILE.description) await this.bot.api.setMyDescription(BOT_PROFILE.description);
+      if (short_description !== BOT_PROFILE.shortDescription) {
+        await this.bot.api.setMyShortDescription(BOT_PROFILE.shortDescription);
+      }
       if (isHttps()) {
         await this.bot.api.setChatMenuButton({
           menu_button: { type: 'web_app', text: 'Skaner', web_app: { url: this.miniAppUrl } },

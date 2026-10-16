@@ -6,6 +6,21 @@ export const BTN = {
   contact: '☎️ Aloqa',
 } as const;
 
+/**
+ * Bot profili. `description` — bo'sh chatda /start'dan oldin ko'rinadi ("Bu bot nima qila oladi?"),
+ * ≤512 belgi. `shortDescription` — bot profili va ulashilgan havolada, ≤120 belgi. Oddiy matn (HTML emas).
+ */
+export const BOT_PROFILE = {
+  description:
+    `🚗 “KIA SONET MENIKI” — Fazo Group aksiyasi!\n\n` +
+    `Fazo'da ovqatlaning va kassir bergan QR'ni telefon kamerasi bilan skanerlang — ` +
+    `kuponlar darhol hisobingizga tushadi. Chek qancha katta bo'lsa, kupon shuncha ko'p.\n\n` +
+    `🎁 Har oy sovg'alar o'ynaladi\n` +
+    `🏆 Yil oxirida — KIA Sonet avtomobili\n\n` +
+    `Boshlash uchun pastdagi tugmani bosing 👇`,
+  shortDescription: `“KIA SONET MENIKI”: chekdagi QR'ni skanerlang, kupon yig'ing — har oy sovg'alar, yil oxirida KIA Sonet 🚗`,
+} as const;
+
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export const T = {
