@@ -3,6 +3,7 @@
 import {
   RiCheckboxCircleFill,
   RiCloseCircleLine,
+  RiKeyboardBoxLine,
   RiCloseLine,
   RiLoader4Line,
   RiPrinterLine,
@@ -14,6 +15,7 @@ import { toast } from 'sonner';
 
 import { useLoad } from '@/components/admin/kit';
 import { noAutofill, PhoneInput, phoneValue } from '@/components/admin/phone-input';
+import { TouchKeyboard, type KbField } from '@/components/admin/touch-keyboard';
 import { VoucherStatusBadge, type VoucherRow } from '@/components/admin/voucher-status';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +29,7 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { adminApi, qs } from '@/lib/api';
 import { fmtPhone, fmtShort, fmtSum } from '@/lib/format';
 import { OUTPUTS, type Terminal, type TerminalOutput } from '@/lib/terminals';
@@ -87,11 +90,17 @@ const writePref = (key: string, v: string) => {
   }
 };
 
+/** Bekor qilish sabablari — sensorli ekranda yozmasdan bir bosishda */
+const QUICK_REASONS = ["Summa noto'g'ri kiritildi", 'Mijoz rad etdi', 'Printer xatosi', 'Chek bekor qilindi'];
+
 const paperOf = (o: TerminalOutput) => (o === 'PRINT_58' ? 58 : 80);
 
 export default function CashierPage() {
   const me = useAdmin();
   const amountRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const terminalsRef = useRef<HTMLDivElement>(null);
   const seesAll = can(me, 'vouchers');
 
   const [amount, setAmount] = useState('');
@@ -105,9 +114,22 @@ export default function CashierPage() {
   const [lastKey, setLastKey] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<VoucherRow | null>(null);
   const [reason, setReason] = useState('');
+  // Sensorli rejim: ilovaning o'z klaviaturasi (iiko sensorli kompyuterida fizik klaviatura yo'q)
+  const [touch, setTouch] = useState(false);
+  const [active, setActive] = useState<KbField>('amount');
 
   // Qaysi terminal oxirgi marta bosilgan — shu qurilmada eslab qolinadi (Enter shuni bosadi)
   useEffect(() => setLastKey(readPref('fc.terminal')), []);
+  // Birinchi marta qurilma sensorli bo'lsa o'zi yoqiladi; keyin tanlov eslab qolinadi
+  useEffect(() => {
+    const saved = readPref('fc.touch');
+    setTouch(saved === null ? navigator.maxTouchPoints > 0 : saved === '1');
+  }, []);
+  const toggleTouch = (on: boolean) => {
+    setTouch(on);
+    writePref('fc.touch', on ? '1' : '0');
+    setTimeout(() => amountRef.current?.focus(), 0);
+  };
 
   const branches = useLoad(() => adminApi<BranchRow[]>('/branches'), []);
   const branchId = me.branch?.id ?? (pickedBranch ? Number(pickedBranch) : null);
@@ -142,8 +164,62 @@ export default function CashierPage() {
     setPhone('');
     setName('');
     setError(null);
+    setActive('amount');
     setTimeout(() => amountRef.current?.focus(), 0);
   }, []);
+
+  // ── Ekran klaviaturasi ──────────────────────────────────────────────────
+  const refs = { amount: amountRef, phone: phoneRef, name: nameRef } as const;
+  const goto = (f: KbField) => {
+    setActive(f);
+    refs[f].current?.focus();
+  };
+  const nameNeedsCap = !name || name.endsWith(' ');
+  const press = (k: string) => {
+    if (active === 'amount') setAmount((a) => onlyDigits(a + k).replace(/^0+/, '').slice(0, 10));
+    else if (active === 'phone') {
+      const next = onlyDigits(phone + k).slice(0, 9);
+      setPhone(next);
+      if (next.length === 9) goto('name'); // raqam to'liq — ismga o'tamiz
+    } else {
+      setName((n) => {
+        if (k === ' ' && (!n || n.endsWith(' '))) return n; // ikki marta/boshida probel yo'q
+        const cap = !n || n.endsWith(' ');
+        return (n + (cap ? k.toUpperCase() : k)).slice(0, 100);
+      });
+    }
+  };
+  const backspace = () => {
+    if (active === 'amount') setAmount((a) => onlyDigits(a).slice(0, -1));
+    else if (active === 'phone') setPhone((p) => p.slice(0, -1));
+    else setName((n) => n.slice(0, -1));
+  };
+  const clearField = () => {
+    if (active === 'amount') setAmount('');
+    else if (active === 'phone') setPhone('');
+    else setName('');
+  };
+  const next = () => {
+    if (active === 'amount') goto('phone');
+    else if (active === 'phone') goto('name');
+    else {
+      // Tayyor: klaviatura va fokusni yopib, terminal tugmalariga o'tamiz
+      (document.activeElement as HTMLElement | null)?.blur();
+      terminalsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+  const keyboard = touch && (
+    <TouchKeyboard
+      field={active}
+      onField={goto}
+      onKey={press}
+      onBackspace={backspace}
+      onClear={clearField}
+      onNext={next}
+      capitalizeNext={nameNeedsCap}
+    />
+  );
+  const kbMode = touch ? ('none' as const) : ('numeric' as const);
 
   const output = (v: Issued, out: TerminalOutput) => {
     if (out === 'SCREEN') setOnScreen(v);
@@ -221,7 +297,12 @@ export default function CashierPage() {
           : '';
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <div
+      className={cn(
+        'mx-auto grid w-full grid-cols-[minmax(0,1fr)] gap-4',
+        touch ? 'max-w-[1400px] lg:grid-cols-[minmax(0,1fr)_minmax(420px,520px)]' : 'max-w-6xl lg:grid-cols-[minmax(0,1fr)_380px]',
+      )}
+    >
       {/* ── Chap: forma va terminallar ─────────────────────────────── */}
       <form
         autoComplete="off"
@@ -232,6 +313,12 @@ export default function CashierPage() {
           if (btn) void issue(btn);
         }}
       >
+        <label className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+          <RiKeyboardBoxLine className="size-4" />
+          Sensorli klaviatura
+          <Switch checked={touch} onCheckedChange={(c) => toggleTouch(Boolean(c))} />
+        </label>
+
         {!me.branch && (
           <Field>
             <FieldLabel>Filial</FieldLabel>
@@ -258,12 +345,18 @@ export default function CashierPage() {
           <label htmlFor="c-sum" className="text-sm font-medium text-muted-foreground">
             Chek summasi
           </label>
-          <div className="mt-1.5 flex items-baseline gap-3 rounded-2xl border-2 border-input px-4 py-2 transition-colors focus-within:border-primary">
+          <div
+            className={cn(
+              'mt-1.5 flex items-baseline gap-3 rounded-2xl border-2 border-input px-4 py-2 transition-colors focus-within:border-primary',
+              touch && active === 'amount' && 'border-primary',
+            )}
+          >
             <input
               id="c-sum"
               ref={amountRef}
               autoFocus
-              inputMode="numeric"
+              inputMode={kbMode}
+              onFocus={() => setActive('amount')}
               {...noAutofill('s1')}
               placeholder="0"
               className="h-16 w-0 min-w-0 flex-1 bg-transparent text-5xl font-bold tabular-nums outline-none placeholder:text-muted-foreground/40 md:h-20 md:text-6xl"
@@ -292,6 +385,9 @@ export default function CashierPage() {
             </label>
             <PhoneInput
               id="c-p"
+              ref={phoneRef}
+              inputMode={kbMode}
+              onFocus={() => setActive('phone')}
               value={phone}
               onChange={setPhone}
               invalid={!phoneOk}
@@ -304,6 +400,9 @@ export default function CashierPage() {
             </label>
             <Input
               id="c-n"
+              ref={nameRef}
+              inputMode={kbMode}
+              onFocus={() => setActive('name')}
               {...noAutofill('n1')}
               className="mt-1.5 h-14 rounded-xl px-3 text-xl md:text-xl"
               value={name}
@@ -313,11 +412,13 @@ export default function CashierPage() {
           </div>
         </div>
 
+        {keyboard && <div className="rounded-2xl border bg-background/50 p-3 lg:hidden">{keyboard}</div>}
+
         {error && (
           <p className="rounded-xl bg-destructive/10 px-4 py-3 text-base font-medium text-destructive">{error}</p>
         )}
 
-        <div>
+        <div ref={terminalsRef}>
           <div className="mb-2 flex items-baseline justify-between gap-2">
             <span className="text-sm font-medium text-muted-foreground">
               {terminals.length ? 'Terminalni bosing' : 'QR chiqarish'}
@@ -359,6 +460,9 @@ export default function CashierPage() {
 
       {/* ── O'ng: oxirgi QR va bugungi ro'yxat ─────────────────────── */}
       <aside className="flex min-w-0 flex-col gap-4">
+        {keyboard && (
+          <div className="sticky top-20 z-10 hidden rounded-2xl border bg-card p-4 shadow-xs lg:block">{keyboard}</div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border bg-card p-4">
             <div className="text-sm text-muted-foreground">Bugun QR</div>
@@ -475,6 +579,22 @@ export default function CashierPage() {
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
+            <div className="mt-2 flex flex-wrap gap-2">
+              {QUICK_REASONS.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setReason(r)}
+                  className={cn(
+                    'h-11 touch-manipulation rounded-full border px-4 text-sm font-medium transition-colors select-none',
+                    reason === r ? 'border-primary bg-primary/10 text-primary' : 'bg-muted/50 hover:bg-muted',
+                  )}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
           </Field>
           <DialogFooter>
             <Button variant="outline" size="lg" onClick={() => setCancelling(null)}>

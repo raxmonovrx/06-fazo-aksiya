@@ -49,11 +49,14 @@ interface PhoneInputProps {
   className?: string;
   inputClassName?: string;
   invalid?: boolean;
+  /** Sensorli rejimda `none`: brauzer klaviaturasi chiqmaydi (o'zimizniki bor) */
+  inputMode?: 'numeric' | 'none';
+  onFocus?: () => void;
 }
 
 /** +998 XX XXX XXXX — prefiks qotirilgan, faqat raqam yoziladi */
 export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(function PhoneInput(
-  { id, value, onChange, className, inputClassName, invalid },
+  { id, value, onChange, className, inputClassName, invalid, inputMode = 'numeric', onFocus },
   ref,
 ) {
   return (
@@ -70,7 +73,8 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(function
         id={id}
         // type="tel" emas: Chrome tel maydonini profil raqami bilan to'ldirishga urinadi
         type="text"
-        inputMode="numeric"
+        inputMode={inputMode}
+        onFocus={onFocus}
         {...noAutofill('p9')}
         placeholder="XX XXX XXXX"
         aria-invalid={invalid || undefined}
