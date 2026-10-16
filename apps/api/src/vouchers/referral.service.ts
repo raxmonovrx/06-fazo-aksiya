@@ -86,7 +86,8 @@ export class ReferralService {
     if (!campaign) return { skipped: 'NO_CAMPAIGN' };
 
     const used = await this.prisma.receipt.aggregate({
-      where: { participantId: inviter.id, source: 'REFERRAL', createdAt: { gte: tashkentMonthStart(now) } },
+      // Bekor qilingan (REJECTED) bonuslar chegarani band qilmaydi
+      where: { participantId: inviter.id, source: 'REFERRAL', status: 'APPROVED', createdAt: { gte: tashkentMonthStart(now) } },
       _sum: { couponsCount: true },
     });
     const give = Math.min(cfg.couponsPerFriend, cfg.monthlyCap - (used._sum.couponsCount ?? 0));

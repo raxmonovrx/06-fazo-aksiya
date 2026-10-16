@@ -46,7 +46,7 @@ export default function PanelLayout({
   const [me, setMe] = useState<AdminMe | null>(null);
   const pathname = usePathname();
   const router = useRouter();
-  // Ruxsat berilmagan sahifa ochilsa (masalan kassir /admin) — o'z sahifasiga
+  // Ruxsat berilmagan sahifa ochilsa (masalan kassir `/`) — o'z sahifasiga
   const allowed = !me || sectionsFor(me).some((s) => inSection(pathname, s.url));
   const home = me && homeFor(me);
   useEffect(() => {
@@ -61,7 +61,7 @@ export default function PanelLayout({
         if (!cancelled) setMe(user);
       })
       .catch(() => {
-        if (!cancelled) window.location.replace('/admin/login');
+        if (!cancelled) window.location.replace('/login');
       });
 
     return () => {

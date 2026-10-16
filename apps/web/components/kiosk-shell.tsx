@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import type { ReactNode } from 'react';
 
-import { useAdmin } from '@/app/admin/(panel)/admin-context';
+import { useAdmin } from '@/app/(admin)/(panel)/admin-context';
 import { inSection, sectionsFor } from '@/components/nav-tree';
 import { handleLogout } from '@/components/nav-user';
 import { Button } from '@/components/ui/button';

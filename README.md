@@ -4,7 +4,7 @@ Kassir admin panelning **Kassa** sahifasida chek summasini kiritadi va bir marta
 
 - Bot: [@fazogroup_bot](https://t.me/fazogroup_bot)
 - Mini app: `https://promo.fazorestaurant.uz/miniapp`
-- Admin panel: `https://panel.fazorestaurant.uz/admin`
+- Admin panel: `https://panel.fazorestaurant.uz` (`/admin` prefiksisiz: `/vouchers`, `/cashier`…)
 - Qoidalar: `https://promo.fazorestaurant.uz/rules`
 
 Texnik topshiriq [SPEC.md](SPEC.md) da. Infratuzilma konteksti [FAZO_AKSIYA_CONTEXT.md](FAZO_AKSIYA_CONTEXT.md) da.
@@ -18,7 +18,7 @@ apps/api     NestJS 12 + Prisma 6 + grammY (bot, webhook)
   src/bot        ro'yxatdan o'tish, bosh xabar, QR rasmi/havolasi
   src/miniapp    mini app API (kuponlar, skaner)
   src/admin      admin API (auth/RBAC, filiallar, terminallar, chek logosi, ishtirokchilar, eksport…)
-apps/web     Next.js 16: /miniapp, /rules, /admin
+apps/web     Next.js 16: mijozlar (/, /miniapp, /rules) va admin panel; domenni `proxy.ts` ajratadi
 tools/       deploy.sh
 infra/       nginx konfiguratsiyasi
 ```
@@ -133,7 +133,7 @@ Bazaga kirish:
 ssh fazo 'cd /opt/fazo-club && docker compose exec postgres psql -U fazo fazo_club'
 ```
 
-RestoBrain admin menyusiga "Fazo Group" tashqi havolasini qo'shing (`https://panel.fazorestaurant.uz/admin`). Kirish shu servisning o'z login/paroli bilan bo'ladi.
+RestoBrain admin menyusiga "Fazo Group" tashqi havolasini qo'shing (`https://panel.fazorestaurant.uz`). Kirish shu servisning o'z login/paroli bilan bo'ladi.
 
 ## Admin uchun qisqa qo'llanma
 

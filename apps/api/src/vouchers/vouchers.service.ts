@@ -3,6 +3,7 @@ import { Prisma, type AdminUser, type Participant, type Voucher } from '@prisma/
 import QRCode from 'qrcode';
 
 import { can } from '../admin/permissions.js';
+import { syncCouponEligibility } from '../participants/eligibility.js';
 import { esc } from '../bot/texts.js';
 import { CampaignService } from '../campaign/campaign.service.js';
 import { config } from '../config.js';
@@ -177,6 +178,81 @@ export class VouchersService {
     return { ok: true };
   }
 
+  // ── Skanerlangandan keyin: bekor qilish va tiklash (firibgarlik) ─────────
+
+  /**
+   * Skanerlangan QR'ning kuponlarini qaytarib oladi: kuponlar o'yindan chiqadi, yozuv va
+   * sabab saqlanadi (tiklash mumkin). Do'stning birinchi xaridi bo'lsa — taklif bonusi ham.
+   */
+  async revoke(actor: AdminUser, id: number, reason: string) {
+    const v = await this.prisma.voucher.findUnique({ where: { id }, select: { id: true, status: true, revokedAt: true, branchId: true, receiptId: true, redeemedById: true, couponsCount: true, amount: true } });
+    if (!v) throw new NotFoundException();
+    this.assertBranch(actor, v.branchId);
+    if (v.status !== 'REDEEMED') throw new ConflictException("Faqat skanerlangan QR'ning kuponlarini bekor qilish mumkin");
+    if (v.revokedAt) throw new ConflictException('Bu QR allaqachon bekor qilingan');
+    await this.prisma.$transaction(async (tx) => {
+      const upd = await tx.voucher.updateMany({
+        where: { id, status: 'REDEEMED', revokedAt: null },
+        data: { revokedAt: new Date(), revokedById: actor.id, revokeReason: reason },
+      });
+      if (!upd.count) throw new ConflictException('Bu QR allaqachon bekor qilingan');
+      await this.applyRevocation(tx, v);
+      await tx.auditLog.create({ data: { actorId: actor.id, action: 'voucher.revoke', entity: 'voucher', entityId: String(id), data: { reason, coupons: v.couponsCount } } });
+    });
+    const p = v.redeemedById ? await this.prisma.participant.findUnique({ where: { id: v.redeemedById }, select: { phone: true, firstName: true } }) : null;
+    void this.alerts.send(
+      `↩️ <b>Kuponlar bekor qilindi</b>: QR #${id}, ${v.couponsCount} kupon (${fmtSum(Number(v.amount))} so'm)\n` +
+        `Skanerlagan: ${esc(p?.phone ?? '—')} ${esc(p?.firstName ?? '')}\nSabab: ${esc(reason)}\nKim: ${esc(actor.login)}`,
+    );
+    return { ok: true };
+  }
+
+  /** Bekor qilishni qaytaradi: kuponlar o'yinga qaytadi (odam bloklangan/xodim bo'lsa — yo'q). */
+  async restore(actor: AdminUser, id: number) {
+    const v = await this.prisma.voucher.findUnique({ where: { id }, select: { id: true, revokedAt: true, branchId: true, receiptId: true, redeemedById: true } });
+    if (!v) throw new NotFoundException();
+    this.assertBranch(actor, v.branchId);
+    if (!v.revokedAt) throw new ConflictException('Bu QR bekor qilinmagan');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.voucher.update({ where: { id }, data: { revokedAt: null, revokedById: null, revokeReason: null } });
+      await this.applyRevocation(tx, v);
+      await tx.auditLog.create({ data: { actorId: actor.id, action: 'voucher.restore', entity: 'voucher', entityId: String(id) } });
+    });
+    return { ok: true };
+  }
+
+  /**
+   * Vaucher bekor qilish holatiga mos kupon yozuvini va (do'stning birinchi xaridi bo'lsa)
+   * taklif bonusini moslaydi, so'ng kuponlarning "o'yinda"ligini qayta hisoblaydi.
+   * `revokedAt` allaqachon yangilangan bo'lishi kerak.
+   */
+  private async applyRevocation(
+    tx: Prisma.TransactionClient,
+    v: { id: number; receiptId: number | null; redeemedById: number | null },
+  ) {
+    const revoked = Boolean((await tx.voucher.findUniqueOrThrow({ where: { id: v.id }, select: { revokedAt: true } })).revokedAt);
+    if (v.receiptId) await tx.receipt.update({ where: { id: v.receiptId }, data: { status: revoked ? 'REJECTED' : 'APPROVED' } });
+    const affected = new Set<number>();
+    if (v.redeemedById) {
+      affected.add(v.redeemedById);
+      const friend = await tx.participant.findUnique({ where: { id: v.redeemedById }, select: { referredById: true } });
+      if (friend?.referredById) {
+        // Taklif bonusi (R<do'st>) — do'stning kamida bitta bekor qilinmagan QR'i bo'lsa saqlanadi
+        const alive = await tx.voucher.count({ where: { redeemedById: v.redeemedById, status: 'REDEEMED', revokedAt: null } });
+        const bonus = await tx.receipt.updateMany({
+          where: { participantId: friend.referredById, source: 'REFERRAL', receiptNumber: `R${v.redeemedById}` },
+          data: { status: alive > 0 ? 'APPROVED' : 'REJECTED' },
+        });
+        if (bonus.count) affected.add(friend.referredById);
+      }
+    }
+    await syncCouponEligibility(tx, [...affected]);
+  }
+
+  private assertBranch(actor: AdminUser, branchId: number) {
+    if (actor.branchId && actor.branchId !== branchId) throw new ForbiddenException();
+  }
+
   /**
    * O'zi chiqarganini har doim; boshqalarnikini — `vouchers.cancel` ruxsati bilan
    * (filialga biriktirilgan bo'lsa — faqat o'z filialida).
@@ -323,9 +399,16 @@ export class VouchersService {
     if (!can(actor, 'vouchers')) where.issuedById = actor.id;
     else if (q.issuedById) where.issuedById = q.issuedById;
     if (actor.branchId) where.branchId = actor.branchId;
+    const and: Prisma.VoucherWhereInput[] = [];
     if (q.status) {
-      const list = q.status.split(',').filter((s): s is 'ISSUED' | 'REDEEMED' | 'CANCELLED' => ['ISSUED', 'REDEEMED', 'CANCELLED'].includes(s));
-      if (list.length) where.status = { in: list };
+      // Skanerlangan = kuponlari o'z kuchida; REVOKED — skanerlangandan keyin bekor qilingan
+      const parts: Prisma.VoucherWhereInput[] = [];
+      for (const st of q.status.split(',')) {
+        if (st === 'ISSUED' || st === 'CANCELLED') parts.push({ status: st });
+        else if (st === 'REDEEMED') parts.push({ status: 'REDEEMED', revokedAt: null });
+        else if (st === 'REVOKED') parts.push({ status: 'REDEEMED', revokedAt: { not: null } });
+      }
+      if (parts.length) and.push({ OR: parts });
     }
     if (q.branchId && !actor.branchId) where.branchId = q.branchId;
     if (q.from || q.to) where.issuedAt = { ...(q.from && { gte: q.from }), ...(q.to && { lte: q.to }) };
@@ -338,9 +421,10 @@ export class VouchersService {
       if (digits.length >= 3) or.push({ customerPhone: { contains: digits } }, { redeemedPhone: { contains: digits } });
       if (/^\d+$/.test(s) && Number(s) < 2_147_483_647) or.push({ id: Number(s) });
       or.push({ customerName: { contains: s, mode: 'insensitive' } }, { redeemedName: { contains: s, mode: 'insensitive' } });
-      where.AND = [{ OR: or }];
+      and.push({ OR: or });
     }
-    const [total, items, sums] = await Promise.all([
+    if (and.length) where.AND = and;
+    const [total, items, sums, revokedSum] = await Promise.all([
       this.prisma.voucher.count({ where }),
       this.prisma.voucher.findMany({
         where,
@@ -352,18 +436,22 @@ export class VouchersService {
           terminal: { select: { id: true, name: true } },
           issuedBy: { select: { id: true, login: true } },
           cancelledBy: { select: { id: true, login: true } },
-          redeemedBy: { select: { id: true, phone: true, firstName: true, lastName: true } },
+          revokedBy: { select: { id: true, login: true } },
+          redeemedBy: { select: { id: true, phone: true, firstName: true, lastName: true, isBlocked: true, isStaff: true } },
         },
       }),
-      this.prisma.voucher.groupBy({ by: ['status'], where, _count: { _all: true }, _sum: { amount: true, couponsCount: true } }),
+      // Skanerlangan — faqat kuponlari o'z kuchida; bekor qilinganlar alohida
+      this.prisma.voucher.groupBy({ by: ['status'], where: { AND: [where, { revokedAt: null }] }, _count: { _all: true }, _sum: { amount: true, couponsCount: true } }),
+      this.prisma.voucher.aggregate({ where: { AND: [where, { status: 'REDEEMED', revokedAt: { not: null } }] }, _count: { _all: true }, _sum: { amount: true, couponsCount: true } }),
     ]);
     return {
       total,
       page: q.page,
       pageSize: q.pageSize,
-      summary: Object.fromEntries(
-        sums.map((s) => [s.status, { count: s._count._all, amount: Number(s._sum.amount ?? 0), coupons: s._sum.couponsCount ?? 0 }]),
-      ),
+      summary: {
+        ...Object.fromEntries(sums.map((s) => [s.status, { count: s._count._all, amount: Number(s._sum.amount ?? 0), coupons: s._sum.couponsCount ?? 0 }])),
+        REVOKED: { count: revokedSum._count._all, amount: Number(revokedSum._sum.amount ?? 0), coupons: revokedSum._sum.couponsCount ?? 0 },
+      },
       items: items.map(({ token: _token, ...rest }) => ({ ...rest, redeemedTgId: rest.redeemedTgId?.toString() ?? null })),
     };
   }

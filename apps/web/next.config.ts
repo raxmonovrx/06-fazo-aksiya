@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
     return [
       { source: '/:path*', headers: security },
       // Admin panel iframe'ga olinmasin. Mini app esa web.telegram.org da iframe ichida ochiladi — unga tegmaymiz.
-      { source: '/admin/:path*', headers: [{ key: 'X-Frame-Options', value: 'DENY' }] },
+      { source: '/((?!miniapp).*)', headers: [{ key: 'X-Frame-Options', value: 'DENY' }] },
     ];
   },
 };

@@ -10,7 +10,7 @@ import {
 } from '@remixicon/react';
 import { useTheme } from 'next-themes';
 
-import type { AdminMe } from '@/app/admin/(panel)/admin-context';
+import type { AdminMe } from '@/app/(admin)/(panel)/admin-context';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -37,7 +37,7 @@ export async function handleLogout() {
     // Sessiya baribir tugaydi — login sahifasiga o'tamiz
   }
   // To'liq sahifa almashinuvi — xotiradagi hamma narsa tozalanadi
-  window.location.replace('/admin/login');
+  window.location.replace('/login');
 }
 
 /** Avatar — brend rangidagi doira */

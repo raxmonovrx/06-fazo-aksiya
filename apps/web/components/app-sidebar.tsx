@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 
-import { useAdmin } from '@/app/admin/(panel)/admin-context';
+import { useAdmin } from '@/app/(admin)/(panel)/admin-context';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -40,7 +40,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             {/* `SidebarMenuButton` emas: u ichidagi belgini 16px ga siqadi */}
             <Link
-              href="/admin"
+              href="/dashboard"
               aria-label="Fazo Group — Dashboard"
               className="flex h-12 items-center gap-2 rounded-md pr-2 pl-[3px] ring-sidebar-ring outline-hidden focus-visible:ring-2 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0"
             >

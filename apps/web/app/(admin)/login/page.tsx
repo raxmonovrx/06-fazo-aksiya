@@ -39,7 +39,8 @@ export default function LoginPage() {
         json: { login, password },
       });
       const next = new URLSearchParams(window.location.search).get('next');
-      window.location.href = next?.startsWith('/admin') ? next : '/admin';
+      // Faqat ichki manzilga qaytaramiz (`//evil.com` kabi tashqi havolaga emas)
+      window.location.href = next?.startsWith('/') && !next.startsWith('//') && !next.startsWith('/login') ? next : '/';
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);

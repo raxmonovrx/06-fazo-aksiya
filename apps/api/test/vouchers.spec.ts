@@ -405,6 +405,54 @@ describe('Vaucherlar (kassir QR)', () => {
     });
   });
 
+  it('skanerlangandan keyin: kuponlarni bekor qilish va tiklash, blok kuponlarni o\'yindan chiqaradi', async () => {
+    const p = await prisma.participant.findUniqueOrThrow({ where: { tgId: BigInt(tg(2)) } });
+    const eligible = () => prisma.coupon.count({ where: { participantId: p.id, eligible: true } });
+    const before = await eligible();
+    const v = await issue('tv_kassa1', { amount: 300000 }); // 3 kupon
+    await t.send(textMessage(tg(2), `/start v_${await tokenOf(v.id)}`));
+    expect(await eligible()).toBe(before + 3);
+    const post = (who: string, path: string, json?: unknown) => api(who, path, { method: 'POST', json });
+
+    // Faqat `vouchers.revoke` ruxsati: kassir, operator va filial menejeri — yo'q
+    for (const who of ['tv_kassa1', 'tv_op', 'tv_manager']) {
+      expect((await post(who, `/vouchers/${v.id}/revoke`, { reason: 'test' })).status).toBe(403);
+    }
+    // Skanerlanmagan QR'da — bekor qilish emas, "Bekor" ishlatiladi
+    const fresh = await issue('tv_kassa1', { amount: 200000 });
+    expect((await post('tv_admin', `/vouchers/${fresh.id}/revoke`, { reason: 'test' })).status).toBe(409);
+    expect((await post('tv_admin', `/vouchers/${v.id}/revoke`, { reason: 'x' })).status).toBe(400); // sabab kamida 2 belgi
+
+    expect((await post('tv_admin', `/vouchers/${v.id}/revoke`, { reason: 'Xodim o\'zi uchun chiqargan' })).status).toBe(200);
+    expect(await eligible()).toBe(before);
+    expect(await prisma.voucher.findUniqueOrThrow({ where: { id: v.id } })).toMatchObject({ status: 'REDEEMED', revokeReason: 'Xodim o\'zi uchun chiqargan' });
+    expect((await prisma.receipt.findFirstOrThrow({ where: { voucher: { id: v.id } } })).status).toBe('REJECTED');
+    expect((await post('tv_admin', `/vouchers/${v.id}/revoke`, { reason: 'yana' })).status).toBe(409);
+    expect(await prisma.auditLog.count({ where: { action: 'voucher.revoke', entityId: String(v.id) } })).toBe(1);
+
+    // Ro'yxat va filtrlar: bekor qilingan alohida, "skanerlangan" tarkibiga kirmaydi
+    const revoked = await (await api('tv_admin', '/vouchers?status=REVOKED&pageSize=200')).json();
+    expect(revoked.items.map((i: any) => i.id)).toContain(v.id);
+    expect(revoked.items.find((i: any) => i.id === v.id).revokedBy.login).toBe(`tv_admin_${RUN}`);
+    const active = await (await api('tv_admin', '/vouchers?status=REDEEMED&pageSize=200')).json();
+    expect(active.items.map((i: any) => i.id)).not.toContain(v.id);
+    expect(revoked.summary.REVOKED.count).toBeGreaterThanOrEqual(1);
+    const dash = await (await api('tv_admin', '/dashboard')).json();
+    expect(dash.vouchers.byState.REVOKED).toBeGreaterThanOrEqual(1);
+    expect(t.calls.some((c) => c.method === 'sendMessage' && /Kuponlar bekor qilindi/.test(c.payload.text ?? ''))).toBe(true);
+
+    // Tiklash
+    expect((await post('tv_admin', `/vouchers/${v.id}/restore`)).status).toBe(200);
+    expect(await eligible()).toBe(before + 3);
+    expect((await post('tv_admin', `/vouchers/${v.id}/restore`)).status).toBe(409);
+
+    // Bloklash: kuponlar o'yindan chiqadi, blok olinsa qaytadi
+    await api('tv_admin', `/participants/${p.id}`, { method: 'PATCH', json: { isBlocked: true } });
+    expect(await eligible()).toBe(0);
+    await api('tv_admin', `/participants/${p.id}`, { method: 'PATCH', json: { isBlocked: false } });
+    expect(await eligible()).toBe(before + 3);
+  });
+
   it('ishtirokchini o\'chirish: faqat admin; kuponlar ketadi, QR qayta ishlatilmaydi, /start — yangidan', async () => {
     const p = await prisma.participant.findUniqueOrThrow({ where: { tgId: BigInt(tg(1)) } });
     const used = await prisma.voucher.findFirstOrThrow({ where: { redeemedById: p.id } });

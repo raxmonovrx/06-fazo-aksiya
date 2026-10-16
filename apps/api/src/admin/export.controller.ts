@@ -142,6 +142,8 @@ export class ExportController {
       { header: 'Bekor sababi', key: 'cancelReason', width: 24 },
     ];
     const STATUS = { ISSUED: 'Kutilmoqda', REDEEMED: 'Skanerlandi', CANCELLED: 'Bekor qilingan' } as const;
+    const stateOf = (v: { status: keyof typeof STATUS; expiresAt: Date; revokedAt: Date | null }) =>
+      v.revokedAt ? "Kuponlari bekor qilingan" : v.status === 'ISSUED' && v.expiresAt <= new Date() ? "Muddati o'tgan" : STATUS[v.status];
     const rows = await this.prisma.voucher.findMany({
       orderBy: { id: 'asc' },
       include: { branch: { select: { name: true } }, terminal: { select: { name: true } }, issuedBy: { select: { login: true } } },
@@ -149,7 +151,7 @@ export class ExportController {
     for (const v of rows) {
       ws.addRow({
         id: v.id,
-        status: v.status === 'ISSUED' && v.expiresAt <= new Date() ? "Muddati o'tgan" : STATUS[v.status],
+        status: stateOf(v),
         branch: v.branch.name,
         terminal: v.terminal?.name ?? '',
         cashier: v.issuedBy.login,
@@ -162,7 +164,7 @@ export class ExportController {
         redeemedTgId: v.redeemedTgId?.toString() ?? '',
         redeemedAt: dt(v.redeemedAt),
         flag: v.redeemedByStaff ? 'xodim' : '',
-        cancelReason: v.cancelReason ?? '',
+        cancelReason: v.revokeReason ?? v.cancelReason ?? '',
       });
     }
   }

@@ -11,7 +11,7 @@ import {
   type RemixiconComponentType,
 } from '@remixicon/react';
 
-import type { AdminMe } from '@/app/admin/(panel)/admin-context';
+import type { AdminMe } from '@/app/(admin)/(panel)/admin-context';
 import type { Permission } from '@/lib/permissions';
 
 /**
@@ -33,15 +33,15 @@ export interface NavSection extends NavItem {
 }
 
 export const NAV_SECTIONS: NavSection[] = [
-  { title: 'Dashboard', url: '/admin', icon: RiDashboardLine, perm: ['dashboard'] },
-  { title: 'Kassa', url: '/admin/cashier', icon: RiQrCodeLine, perm: ['cashier'] },
-  { title: 'Vaucherlar', url: '/admin/vouchers', icon: RiTicket2Line, perm: ['vouchers'] },
-  { title: 'Ishtirokchilar', url: '/admin/participants', icon: RiGroupLine, perm: ['participants'] },
-  { title: 'Filiallar va kassalar', url: '/admin/branches', icon: RiBuilding2Line, perm: ['branches'] },
-  { title: 'Xodimlar', url: '/admin/staff', icon: RiUserStarLine, perm: ['staff'] },
-  { title: 'Eksport', url: '/admin/export', icon: RiDownload2Line, perm: ['export'] },
-  { title: 'Foydalanuvchilar', url: '/admin/users', icon: RiUserSettingsLine, perm: ['users'] },
-  { title: 'Sozlamalar', url: '/admin/settings', icon: RiSettings3Line, perm: ['settings'] },
+  { title: 'Dashboard', url: '/dashboard', icon: RiDashboardLine, perm: ['dashboard'] },
+  { title: 'Kassa', url: '/cashier', icon: RiQrCodeLine, perm: ['cashier'] },
+  { title: 'Vaucherlar', url: '/vouchers', icon: RiTicket2Line, perm: ['vouchers'] },
+  { title: 'Ishtirokchilar', url: '/participants', icon: RiGroupLine, perm: ['participants'] },
+  { title: 'Filiallar va kassalar', url: '/branches', icon: RiBuilding2Line, perm: ['branches'] },
+  { title: 'Xodimlar', url: '/staff', icon: RiUserStarLine, perm: ['staff'] },
+  { title: 'Eksport', url: '/export', icon: RiDownload2Line, perm: ['export'] },
+  { title: 'Foydalanuvchilar', url: '/users', icon: RiUserSettingsLine, perm: ['users'] },
+  { title: 'Sozlamalar', url: '/settings', icon: RiSettings3Line, perm: ['settings'] },
 ];
 
 /** Xodimga ochiq bo'limlar */
@@ -65,17 +65,14 @@ export function isKiosk(me: Pick<AdminMe, 'permissions'>): boolean {
   return perms.includes('cashier') && !perms.includes('dashboard');
 }
 
-/**
- * Manzil bo'limga tegishlimi. Dashboard (`/admin`) — boshqa hamma
- * bo'limlarning otasi, shuning uchun u faqat aniq moslikda yonadi.
- */
+/** Manzil bo'limga tegishlimi (chegara bilan: `/vouchers` yoki `/vouchers/…`). */
 export function inSection(pathname: string, url: string): boolean {
-  return url === '/admin' ? pathname === url : isUnder(pathname, url);
+  return isUnder(pathname, url);
 }
 
 /**
  * Manzil qaysi bo'limga tegishli. Chegara bilan solishtiriladi
- * (`/admin/receipts` yoki `/admin/receipts/…`), oddiy `startsWith` emas.
+ * (`/vouchers` yoki `/vouchers/…`), oddiy `startsWith` emas.
  */
 export function sectionFor(pathname: string): NavSection | undefined {
   return NAV_SECTIONS.find((s) => inSection(pathname, s.url));

@@ -20,7 +20,7 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { useAdmin } from "@/app/admin/(panel)/admin-context"
+import { useAdmin } from "@/app/(admin)/(panel)/admin-context"
 import { activeItemIndex, inSection, sectionsFor, type NavSection } from "@/components/nav-tree"
 import { cn } from "@/lib/utils"
 

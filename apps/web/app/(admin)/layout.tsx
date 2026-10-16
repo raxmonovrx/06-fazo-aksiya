@@ -3,7 +3,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 /**
- * Butun /admin (login ham) — yorug'/qorong'i mavzu va shadcn tokenlari.
+ * Butun admin panel (login ham) — yorug'/qorong'i mavzu va shadcn tokenlari.
  * `.admin-root` globals.css da shrift, fon va chegara rangini yoqadi —
  * mini app va ochiq sahifalarga tegmaydi.
  */

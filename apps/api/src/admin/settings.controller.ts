@@ -81,18 +81,20 @@ export class SettingsController {
         this.prisma.coupon.count({ where: { eligible: true, createdAt: { gte: todayStart } } }),
         this.prisma.coupon.count({ where: { eligible: true, receipt: { source: 'REFERRAL' } } }),
         this.prisma.voucher.count({ where: { issuedAt: { gte: todayStart } } }),
-        this.prisma.voucher.count({ where: { redeemedAt: { gte: todayStart } } }),
+        this.prisma.voucher.count({ where: { redeemedAt: { gte: todayStart }, revokedAt: null } }),
         this.prisma.$queryRaw<Array<{ state: string; n: number }>>`
-          SELECT CASE WHEN status = 'ISSUED' AND "expiresAt" <= ${now} THEN 'EXPIRED' ELSE status::text END AS state,
+          SELECT CASE WHEN status = 'ISSUED' AND "expiresAt" <= ${now} THEN 'EXPIRED'
+                      WHEN status = 'REDEEMED' AND "revokedAt" IS NOT NULL THEN 'REVOKED'
+                      ELSE status::text END AS state,
                  count(*)::int AS n
           FROM vouchers GROUP BY 1`,
         this.prisma.branch.findMany({ select: { id: true, name: true }, orderBy: { id: 'asc' } }),
         this.prisma.$queryRaw<Array<{ branchId: number; issued: number; redeemed: number; amount: string | null; coupons: number }>>`
           SELECT v."branchId",
                  count(*) FILTER (WHERE v.status <> 'CANCELLED')::int AS issued,
-                 count(*) FILTER (WHERE v.status = 'REDEEMED')::int AS redeemed,
-                 sum(v.amount) FILTER (WHERE v.status = 'REDEEMED')::text AS amount,
-                 coalesce(sum(v."couponsCount") FILTER (WHERE v.status = 'REDEEMED'), 0)::int AS coupons
+                 count(*) FILTER (WHERE v.status = 'REDEEMED' AND v."revokedAt" IS NULL)::int AS redeemed,
+                 sum(v.amount) FILTER (WHERE v.status = 'REDEEMED' AND v."revokedAt" IS NULL)::text AS amount,
+                 coalesce(sum(v."couponsCount") FILTER (WHERE v.status = 'REDEEMED' AND v."revokedAt" IS NULL), 0)::int AS coupons
           FROM vouchers v GROUP BY v."branchId"`,
       ]);
     return {
@@ -101,7 +103,7 @@ export class SettingsController {
       vouchers: {
         issuedToday,
         redeemedToday,
-        byState: Object.fromEntries(states.map((s) => [s.state, s.n])) as Partial<Record<'ISSUED' | 'REDEEMED' | 'CANCELLED' | 'EXPIRED', number>>,
+        byState: Object.fromEntries(states.map((s) => [s.state, s.n])) as Partial<Record<'ISSUED' | 'REDEEMED' | 'CANCELLED' | 'EXPIRED' | 'REVOKED', number>>,
       },
       branches: branches.map((b) => {
         const row = perBranch.find((x) => x.branchId === b.id);

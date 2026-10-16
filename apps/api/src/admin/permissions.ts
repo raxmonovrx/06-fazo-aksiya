@@ -9,6 +9,7 @@ export const PERMISSIONS = [
   'cashier',
   'vouchers',
   'vouchers.cancel',
+  'vouchers.revoke',
   'participants',
   'participants.edit',
   'branches',

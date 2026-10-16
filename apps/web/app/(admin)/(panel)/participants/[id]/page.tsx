@@ -176,7 +176,7 @@ export default function ParticipantPage() {
     p
       ? {
           title: p.phone ? fmtPhone(p.phone) : name || `#${p.id}`,
-          backHref: '/admin/participants',
+          backHref: '/participants',
         }
       : null,
   );
@@ -214,7 +214,7 @@ export default function ParticipantPage() {
     try {
       const r = await adminApi<{ coupons: number; receipts: number }>(`/participants/${p.id}`, { method: 'DELETE' });
       toast.success(`${who} o'chirildi (${r.coupons} kupon, ${r.receipts} chek)`);
-      router.replace('/admin/participants');
+      router.replace('/participants');
     } catch (e) {
       toast.error((e as Error).message);
       setBusy(false);
@@ -453,19 +453,26 @@ export default function ParticipantPage() {
                 </TableHeader>
                 <TableBody>
                   {p.receipts.map((r) => (
-                    <TableRow key={r.id}>
+                    <TableRow key={r.id} className={cn(r.status !== 'APPROVED' && 'text-muted-foreground')}>
                       <TableCell className="pl-4">
                         <div className="flex items-baseline gap-2">
                           <span className="font-medium">{r.source === 'REFERRAL' ? 'Taklif bonusi' : 'Kassa QR'}</span>
                           {r.source === 'VOUCHER' && r.receiptNumber && (
                             <span className="font-mono text-xs text-muted-foreground">#{r.receiptNumber.replace(/^V/, '')}</span>
                           )}
+                          {r.status !== 'APPROVED' && (
+                            <Badge variant="destructive" className="h-4.5 px-1.5 text-[11px] font-normal">
+                              bekor qilingan
+                            </Badge>
+                          )}
                         </div>
                         <div className="text-xs text-muted-foreground tabular-nums">{fmtShort(r.createdAt)}</div>
                       </TableCell>
                       <TableCell>{r.branch?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="text-right tabular-nums">{r.amount ? fmtSum(r.amount) : '—'}</TableCell>
-                      <TableCell className="pr-4 text-right font-semibold tabular-nums">{r.couponsCount}</TableCell>
+                      <TableCell className={cn('pr-4 text-right font-semibold tabular-nums', r.status !== 'APPROVED' && 'font-normal line-through')}>
+                        {r.couponsCount}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -523,7 +530,7 @@ export default function ParticipantPage() {
                     value: p.referredBy ? (
                       <Link
                         className="font-medium text-primary hover:underline"
-                        href={`/admin/participants/${p.referredBy.id}`}
+                        href={`/participants/${p.referredBy.id}`}
                       >
                         {p.referredBy.phone ??
                           p.referredBy.firstName ??

@@ -307,7 +307,13 @@ function Row({ r }: { r: ReceiptRow }) {
   // Kassa QR'i (filial nomi) yoki taklif bonusi — ikkalasi ham darhol tasdiqlanadi
   const name = r.source === 'REFERRAL' ? "Do'st taklifi" : (r.branch?.name ?? 'Kassa QR');
   const meta = [fmtShort(r.createdAt), r.amount ? `${sum(r.amount)} so'm` : null].filter(Boolean).join(' · ');
-  const right = <span className="c-brand t-body-sb">+{r.couponsCount}</span>;
+  // Bekor qilingan (firibgarlik aniqlangan) yozuv kupon bermaydi
+  const right =
+    r.status === 'APPROVED' ? (
+      <span className="c-brand t-body-sb">+{r.couponsCount}</span>
+    ) : (
+      <span className="c-err t-foot">Bekor qilingan</span>
+    );
   return (
     <div className="row">
       <div className="row-main">

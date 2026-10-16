@@ -14,9 +14,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { adminApi } from '@/lib/api';
 import { fmtPhone, fmtShort, fmtSum } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { can, useAdmin } from './admin-context';
+import { can, useAdmin } from '../admin-context';
 
-type VoucherState = 'ISSUED' | 'REDEEMED' | 'EXPIRED' | 'CANCELLED';
+type VoucherState = 'ISSUED' | 'REDEEMED' | 'EXPIRED' | 'CANCELLED' | 'REVOKED';
 
 interface Dashboard {
   participants: { total: number; today: number; staff: number };
@@ -30,6 +30,7 @@ const STATES: Array<{ key: VoucherState; label: string; dot: string }> = [
   { key: 'ISSUED', label: 'Kutilmoqda', dot: 'bg-amber-500' },
   { key: 'EXPIRED', label: "Muddati o'tgan", dot: 'bg-zinc-400' },
   { key: 'CANCELLED', label: 'Bekor qilingan', dot: 'bg-red-400' },
+  { key: 'REVOKED', label: 'Kuponlari olib tashlangan', dot: 'bg-red-600' },
 ];
 
 const num = (n: number) => n.toLocaleString('ru-RU').replace(/\s/g, ' ');
@@ -176,7 +177,7 @@ export default function DashboardPage() {
             title="So'nggi QR'lar"
             description="Kassalar chiqargan oxirgi 8 ta QR"
             action={
-              <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/admin/vouchers" />}>
+              <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/vouchers" />}>
                 Barchasi
                 <RiArrowRightLine data-icon="inline-end" />
               </Button>

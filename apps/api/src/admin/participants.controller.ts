@@ -3,6 +3,7 @@ import type { AdminUser, Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 import { normalizePhone } from '../core/phone.js';
+import { syncCouponEligibility } from '../participants/eligibility.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AdminGuard, AdminOnly, CurrentAdmin, Perm } from './auth.js';
 import { AuditService } from './audit.service.js';
@@ -120,7 +121,8 @@ export class ParticipantsController {
     const data = parse(patchSchema, body);
     const p = await this.prisma.participant.update({ where: { id }, data }).catch(() => null);
     if (!p) throw new NotFoundException();
-    if (data.isStaff !== undefined) await syncCouponEligibility(this.prisma, [id]);
+    // Xodim yoki bloklangan odamning kuponlari o'yindan chiqadi; blok/xodim belgisi olinsa — qaytadi
+    if (data.isStaff !== undefined || data.isBlocked !== undefined) await syncCouponEligibility(this.prisma, [id]);
     await this.audit.log(admin.id, 'participant.update', 'participant', id, data);
     return p;
   }
@@ -217,14 +219,4 @@ export async function syncStaffFlags(prisma: PrismaService): Promise<number> {
     RETURNING p.id`;
   if (changed.length) await syncCouponEligibility(prisma, changed.map((c) => c.id));
   return changed.length;
-}
-
-/** Xodim kuponlari o'yinda qatnashmaydi; faqat APPROVED cheklarning kuponlari eligible bo'la oladi. */
-export async function syncCouponEligibility(prisma: PrismaService, participantIds: number[]) {
-  if (!participantIds.length) return;
-  await prisma.$executeRaw`
-    UPDATE coupons c
-    SET eligible = (NOT p."isStaff" AND r.status = 'APPROVED')
-    FROM participants p, receipts r
-    WHERE c."participantId" = p.id AND c."receiptId" = r.id AND p.id = ANY(${participantIds})`;
 }

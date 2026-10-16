@@ -7,6 +7,7 @@ export type Permission =
   | 'cashier'
   | 'vouchers'
   | 'vouchers.cancel'
+  | 'vouchers.revoke'
   | 'participants'
   | 'participants.edit'
   | 'branches'
@@ -28,6 +29,7 @@ export const PERMISSION_GROUPS: Array<{
       { value: 'cashier', label: 'Kassa', hint: "Mijozga QR chiqaradi, o'zi chiqarganini bekor qiladi" },
       { value: 'vouchers', label: 'Vaucherlar', hint: 'Barcha QR ro\'yxati (filialga biriktirilgan bo\'lsa — o\'z filiali)' },
       { value: 'vouchers.cancel', label: 'Boshqalarning QR\'ini bekor qilish', hint: 'Boshqa kassirlar chiqargan QR\'ni bekor qiladi va qayta chop etadi' },
+      { value: 'vouchers.revoke', label: 'Skanerlangan QR kuponlarini qaytarib olish', hint: 'Firibgarlik aniqlansa: kuponlar o\'yindan chiqariladi, tiklash mumkin' },
     ],
   },
   {

@@ -1,6 +1,6 @@
 'use client';
 
-import { RiAlertLine, RiCloseCircleLine, RiTicket2Line } from '@remixicon/react';
+import { RiAlertLine, RiArrowGoBackLine, RiCloseCircleLine, RiForbidLine, RiMore2Fill, RiTicket2Line } from '@remixicon/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -26,6 +26,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -39,19 +50,23 @@ interface Page {
   total: number;
   page: number;
   pageSize: number;
-  summary: Partial<Record<'ISSUED' | 'REDEEMED' | 'CANCELLED', { count: number; amount: number; coupons: number }>>;
+  summary: Partial<Record<'ISSUED' | 'REDEEMED' | 'CANCELLED' | 'REVOKED', { count: number; amount: number; coupons: number }>>;
   items: VoucherRow[];
 }
 
 const STATUS_OPTIONS = [
   { value: 'ISSUED', label: 'Kutilmoqda' },
   { value: 'REDEEMED', label: 'Skanerlandi' },
+  { value: 'REVOKED', label: 'Kuponlari olib tashlangan' },
   { value: 'CANCELLED', label: 'Bekor qilingan' },
 ];
 
 export default function VouchersPage() {
   const me = useAdmin();
   const canCancel = can(me, 'vouchers.cancel');
+  const canRevoke = can(me, 'vouchers.revoke');
+  const canBlock = can(me, 'participants.edit');
+  const showActions = canCancel || canRevoke || canBlock;
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [branchId, setBranchId] = useState('');
@@ -59,7 +74,10 @@ export default function VouchersPage() {
   const [flagged, setFlagged] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [cancelling, setCancelling] = useState<VoucherRow | null>(null);
+  // Sabab so'raladigan amal: skanerlanmagan QR'ni bekor qilish yoki skanerlanganning kuponlarini qaytarib olish
+  const [cancelling, setCancelling] = useState<{ kind: 'cancel' | 'revoke'; v: VoucherRow } | null>(null);
+  const [blocking, setBlocking] = useState<VoucherRow | null>(null);
+  const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState('');
   const dq = useDebounced(q.trim());
 
@@ -93,17 +111,45 @@ export default function VouchersPage() {
   const s = data?.summary ?? {};
   const issuedTotal = (s.ISSUED?.count ?? 0) + (s.REDEEMED?.count ?? 0) + (s.CANCELLED?.count ?? 0);
 
-  const confirmCancel = async () => {
-    if (!cancelling) return;
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
+    setBusy(true);
     try {
-      await adminApi(`/vouchers/${cancelling.id}/cancel`, { method: 'POST', json: { reason } });
-      toast.success(`QR #${cancelling.id} bekor qilindi`);
-      setCancelling(null);
-      setReason('');
+      await fn();
+      toast.success(ok);
       void reload();
+      return true;
     } catch (err) {
       toast.error((err as Error).message);
+      return false;
+    } finally {
+      setBusy(false);
     }
+  };
+
+  const confirmCancel = async () => {
+    if (!cancelling) return;
+    const { kind, v } = cancelling;
+    const ok = await run(
+      () => adminApi(`/vouchers/${v.id}/${kind === 'revoke' ? 'revoke' : 'cancel'}`, { method: 'POST', json: { reason } }),
+      kind === 'revoke' ? `QR #${v.id}: ${v.couponsCount} kupon o'yindan chiqarildi` : `QR #${v.id} bekor qilindi`,
+    );
+    if (ok) {
+      setCancelling(null);
+      setReason('');
+    }
+  };
+
+  const restore = (v: VoucherRow) =>
+    run(() => adminApi(`/vouchers/${v.id}/restore`, { method: 'POST' }), `QR #${v.id}: kuponlar qaytarildi`);
+
+  const confirmBlock = async () => {
+    const v = blocking;
+    if (!v?.redeemedBy) return;
+    const ok = await run(
+      () => adminApi(`/participants/${v.redeemedBy!.id}`, { method: 'PATCH', json: { isBlocked: true } }),
+      `${fmtPhone(v.redeemedBy.phone)} bloklandi, kuponlari o'yindan chiqdi`,
+    );
+    if (ok) setBlocking(null);
   };
 
   return (
@@ -112,7 +158,11 @@ export default function VouchersPage() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Chiqarilgan" value={issuedTotal} />
-        <StatCard label="Skanerlangan" value={s.REDEEMED?.count ?? 0} />
+        <StatCard
+          label="Skanerlangan"
+          value={s.REDEEMED?.count ?? 0}
+          sub={s.REVOKED?.count ? `kuponi olib tashlangan: ${s.REVOKED.count}` : undefined}
+        />
         <StatCard label="Berilgan kupon" value={s.REDEEMED?.coupons ?? 0} />
         <StatCard label="Skanerlangan summa" value={fmtSum(s.REDEEMED?.amount ?? 0)} />
       </div>
@@ -175,12 +225,12 @@ export default function VouchersPage() {
                 <TableHead>Kassada aytgan</TableHead>
                 <TableHead>Botda (skanerlagan)</TableHead>
                 <TableHead>Holat</TableHead>
-                {canCancel && <TableHead className="pr-4" />}
+                {showActions && <TableHead className="pr-4" />}
               </TableRow>
             </TableHeader>
             <TableBody>
               {data?.items.map((v) => (
-                <TableRow key={v.id} className={cn(v.redeemedByStaff && 'bg-amber-500/5')}>
+                <TableRow key={v.id} className={cn(v.redeemedByStaff && 'bg-amber-500/5', v.revokedAt && 'bg-red-500/5 text-muted-foreground')}>
                   <TableCell className="pl-4 text-muted-foreground">#{v.id}</TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums">{fmtShort(v.issuedAt)}</TableCell>
                   <TableCell>
@@ -204,13 +254,18 @@ export default function VouchersPage() {
                           {fmtPhone(v.redeemedPhone)} · tg {v.redeemedTgId}
                         </div>
                         {v.redeemedAt && <div className="text-xs text-muted-foreground">{fmtShort(v.redeemedAt)}</div>}
+                        {v.redeemedBy?.isBlocked && (
+                          <Badge variant="destructive" className="mt-1 h-4.5 px-1.5 text-[11px] font-normal">
+                            bloklangan
+                          </Badge>
+                        )}
                       </>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell>
-                    <VoucherStatusBadge v={v} detail={v.status !== 'REDEEMED'} />
+                    <VoucherStatusBadge v={v} detail={v.status !== 'REDEEMED' || Boolean(v.revokedAt)} />
                     {v.redeemedByStaff && (
                       <div className="mt-0.5 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
                         <RiAlertLine className="size-3" />
@@ -218,12 +273,39 @@ export default function VouchersPage() {
                       </div>
                     )}
                   </TableCell>
-                  {canCancel && (
+                  {showActions && (
                     <TableCell className="pr-4 text-right">
-                      {v.status === 'ISSUED' && (
-                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setCancelling(v)}>
+                      {v.status === 'ISSUED' && canCancel && (
+                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setCancelling({ kind: 'cancel', v })}>
                           <RiCloseCircleLine /> Bekor
                         </Button>
+                      )}
+                      {v.status === 'REDEEMED' && v.revokedAt && canRevoke && (
+                        <Button size="sm" variant="ghost" disabled={busy} onClick={() => void restore(v)}>
+                          <RiArrowGoBackLine /> Tiklash
+                        </Button>
+                      )}
+                      {v.status === 'REDEEMED' && !v.revokedAt && (canRevoke || (canBlock && v.redeemedBy && !v.redeemedBy.isBlocked)) && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`QR #${v.id} amallari`} />}>
+                            <RiMore2Fill />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-64">
+                            {canRevoke && (
+                              <DropdownMenuItem variant="destructive" onClick={() => setCancelling({ kind: 'revoke', v })}>
+                                <RiCloseCircleLine />
+                                Kuponlarni bekor qilish
+                              </DropdownMenuItem>
+                            )}
+                            {canRevoke && canBlock && v.redeemedBy && !v.redeemedBy.isBlocked && <DropdownMenuSeparator />}
+                            {canBlock && v.redeemedBy && !v.redeemedBy.isBlocked && (
+                              <DropdownMenuItem variant="destructive" onClick={() => setBlocking(v)}>
+                                <RiForbidLine />
+                                Skanerlagan odamni bloklash
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </TableCell>
                   )}
@@ -234,26 +316,64 @@ export default function VouchersPage() {
         )}
       </DataTableCard>
 
-      <Dialog open={cancelling !== null} onOpenChange={(o) => !o && setCancelling(null)}>
+      <Dialog
+        open={cancelling !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setCancelling(null);
+            setReason('');
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>QR #{cancelling?.id} ni bekor qilish</DialogTitle>
-            <DialogDescription>Bekor qilingan QR skanerlansa, kupon berilmaydi.</DialogDescription>
+            <DialogTitle>
+              {cancelling?.kind === 'revoke' ? `QR #${cancelling.v.id} kuponlarini bekor qilish` : `QR #${cancelling?.v.id} ni bekor qilish`}
+            </DialogTitle>
+            <DialogDescription>
+              {cancelling?.kind === 'revoke'
+                ? `${cancelling.v.couponsCount} ta kupon o'yindan chiqariladi (${fmtPhone(cancelling.v.redeemedPhone)}). Yozuv va sabab saqlanadi, keyin "Tiklash" bilan qaytarish mumkin. Admin guruhiga xabar boradi.`
+                : 'Bekor qilingan QR skanerlansa, kupon berilmaydi.'}
+            </DialogDescription>
           </DialogHeader>
           <Field>
             <FieldLabel htmlFor="reason">Sabab</FieldLabel>
-            <Input id="reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+            <Input
+              id="reason"
+              autoFocus
+              placeholder={cancelling?.kind === 'revoke' ? "Masalan: xodim o'ziga chiqargan" : "Masalan: summa noto'g'ri kiritildi"}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
           </Field>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCancelling(null)}>
               Yopish
             </Button>
-            <Button variant="destructive" disabled={reason.trim().length < 2} onClick={confirmCancel}>
-              Bekor qilish
+            <Button variant="destructive" disabled={busy || reason.trim().length < 2} onClick={() => void confirmCancel()}>
+              {cancelling?.kind === 'revoke' ? 'Kuponlarni bekor qilish' : 'Bekor qilish'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={blocking !== null} onOpenChange={(o) => !o && setBlocking(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{blocking && fmtPhone(blocking.redeemedPhone)} bloklansinmi?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu odamning barcha kuponlari o&apos;yindan chiqadi va u yangi QR skanerlay olmaydi. Blokni ishtirokchi sahifasidan olib tashlash mumkin,
+              shunda kuponlar qaytadi.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
+            <Button variant="destructive" disabled={busy} onClick={() => void confirmBlock()}>
+              Bloklash
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageContainer>
   );
 }

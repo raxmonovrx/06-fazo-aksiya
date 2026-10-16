@@ -65,6 +65,21 @@ export class VouchersController {
     return this.vouchers.reprint(admin, id);
   }
 
+  /** Skanerlangan QR'ning kuponlarini bekor qilish (firibgarlik) — faqat `vouchers.revoke` ruxsati */
+  @Post(':id/revoke')
+  @HttpCode(200)
+  @Perm('vouchers.revoke')
+  revoke(@Param('id', ParseIntPipe) id: number, @Body() body: unknown, @CurrentAdmin() admin: AdminUser) {
+    return this.vouchers.revoke(admin, id, parse(cancelSchema, body).reason);
+  }
+
+  @Post(':id/restore')
+  @HttpCode(200)
+  @Perm('vouchers.revoke')
+  restore(@Param('id', ParseIntPipe) id: number, @CurrentAdmin() admin: AdminUser) {
+    return this.vouchers.restore(admin, id);
+  }
+
   @Post(':id/cancel')
   @HttpCode(200)
   @Perm('cashier', 'vouchers.cancel')

@@ -230,6 +230,7 @@ model AdminUser {
   auditLogs         AuditLog[]
   issuedVouchers    Voucher[]  @relation("VoucherIssuer")
   cancelledVouchers Voucher[]  @relation("VoucherCanceller")
+  revokedVouchers   Voucher[]  @relation("VoucherRevoker")
 
   @@map("admin_users")
 }
@@ -298,10 +299,16 @@ model Voucher {
   cancelledById   Int?
   cancelledAt     DateTime?     @db.Timestamptz(3)
   cancelReason    String?
+  // Skanerlangandan keyin bekor qilingan (firibgarlik): kuponlar o'yindan chiqarilgan,
+  // yozuv saqlanadi va tiklash mumkin. Holat REDEEMED bo'lib qoladi
+  revokedAt       DateTime?     @db.Timestamptz(3)
+  revokedById     Int?
+  revokeReason    String?
 
   branch      Branch       @relation(fields: [branchId], references: [id])
   issuedBy    AdminUser    @relation("VoucherIssuer", fields: [issuedById], references: [id])
   cancelledBy AdminUser?   @relation("VoucherCanceller", fields: [cancelledById], references: [id])
+  revokedBy   AdminUser?   @relation("VoucherRevoker", fields: [revokedById], references: [id])
   redeemedBy  Participant? @relation(fields: [redeemedById], references: [id])
   receipt     Receipt?     @relation(fields: [receiptId], references: [id])
   terminal    Terminal?    @relation(fields: [terminalId], references: [id])

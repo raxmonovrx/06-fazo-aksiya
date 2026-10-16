@@ -24,14 +24,28 @@ export interface VoucherRow {
   redeemedByStaff: boolean;
   cancelReason: string | null;
   cancelledAt: string | null;
+  /** Skanerlangandan keyin kuponlari qaytarib olingan (firibgarlik) */
+  revokedAt: string | null;
+  revokeReason: string | null;
+  revokedBy: { id: number; login: string } | null;
   branch: { id: number; name: string };
   terminal: { id: number; name: string } | null;
   issuedBy: { id: number; login: string };
   cancelledBy: { id: number; login: string } | null;
-  redeemedBy: { id: number; phone: string | null; firstName: string | null; lastName: string | null } | null;
+  redeemedBy: {
+    id: number;
+    phone: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    isBlocked: boolean;
+    isStaff: boolean;
+  } | null;
 }
 
-export function voucherState(v: Pick<VoucherRow, 'status' | 'expiresAt'>): 'ISSUED' | 'REDEEMED' | 'CANCELLED' | 'EXPIRED' {
+export type VoucherState = 'ISSUED' | 'REDEEMED' | 'REVOKED' | 'CANCELLED' | 'EXPIRED';
+
+export function voucherState(v: Pick<VoucherRow, 'status' | 'expiresAt' | 'revokedAt'>): VoucherState {
+  if (v.status === 'REDEEMED' && v.revokedAt) return 'REVOKED';
   if (v.status === 'ISSUED' && new Date(v.expiresAt) <= new Date()) return 'EXPIRED';
   return v.status;
 }
@@ -39,6 +53,7 @@ export function voucherState(v: Pick<VoucherRow, 'status' | 'expiresAt'>): 'ISSU
 const LABEL = {
   ISSUED: { text: 'Kutilmoqda', dot: 'bg-amber-500' },
   REDEEMED: { text: 'Skanerlandi', dot: 'bg-emerald-500' },
+  REVOKED: { text: 'Kuponlari olib tashlangan', dot: 'bg-red-500' },
   CANCELLED: { text: 'Bekor qilingan', dot: 'bg-zinc-400' },
   EXPIRED: { text: "Muddati o'tgan", dot: 'bg-zinc-400' },
 } as const;
@@ -52,7 +67,7 @@ export function VoucherStatusBadge({ v, detail = true }: { v: VoucherRow; detail
         <span aria-hidden className={cn('size-1.5 rounded-full', s.dot)} />
         {s.text}
       </Badge>
-      {detail && v.status === 'REDEEMED' && (
+      {detail && v.status === 'REDEEMED' && !v.revokedAt && (
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
           {fmtPhone(v.redeemedPhone)}
           {v.redeemedByStaff && (
@@ -64,7 +79,15 @@ export function VoucherStatusBadge({ v, detail = true }: { v: VoucherRow; detail
         </span>
       )}
       {detail && v.status === 'CANCELLED' && v.cancelReason && (
-        <span className="text-xs text-muted-foreground">{v.cancelReason}</span>
+        <span className="block max-w-48 truncate text-xs text-muted-foreground" title={v.cancelReason}>
+          {v.cancelReason}
+        </span>
+      )}
+      {detail && v.revokedAt && (
+        <span className="block max-w-48 truncate text-xs text-muted-foreground" title={`${v.revokeReason ?? ''}${v.revokedBy ? ` · ${v.revokedBy.login}` : ''}`}>
+          {v.revokeReason}
+          {v.revokedBy && ` · ${v.revokedBy.login}`}
+        </span>
       )}
     </div>
   );

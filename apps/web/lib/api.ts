@@ -19,7 +19,7 @@ export async function adminApi<T = unknown>(path: string, init: RequestInit & { 
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   });
   if (res.status === 401 && !path.startsWith('/auth/login')) {
-    window.location.href = `/admin/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+    window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
     throw new ApiError(401, 'Kirish kerak');
   }
   if (!res.ok) {

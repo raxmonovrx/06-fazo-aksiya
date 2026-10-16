@@ -138,7 +138,7 @@ function ParticipantsTable() {
     setBlocked('');
     setPage(1);
   };
-  const open = (id: number) => router.push(`/admin/participants/${id}`);
+  const open = (id: number) => router.push(`/participants/${id}`);
 
   return (
     <>

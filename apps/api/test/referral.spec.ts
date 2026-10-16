@@ -132,6 +132,26 @@ describe('Taklif bonusi', () => {
     expect(await bonusCoupons(1)).toBe(1);
   });
 
+  it('do\'stning birinchi xaridi bekor qilinsa — taklif bonusi ham qaytariladi, tiklansa — qaytadi', async () => {
+    const inviter = await prisma.participant.findUniqueOrThrow({ where: { tgId: BigInt(tg(1)) } });
+    const friend = await prisma.participant.findUniqueOrThrow({ where: { tgId: BigInt(tg(2)) } });
+    const bonus = () => prisma.coupon.count({ where: { participantId: inviter.id, eligible: true, receipt: { source: 'REFERRAL' } } });
+    expect(await bonus()).toBe(1);
+    const [first, second] = await prisma.voucher.findMany({ where: { redeemedById: friend.id }, orderBy: { id: 'asc' } });
+    const post = (path: string, json?: unknown) => api('tr_admin', path, { method: 'POST', json });
+
+    // Do'stning yana bitta haqiqiy xaridi bor — bonus qoladi
+    expect((await post(`/vouchers/${first.id}/revoke`, { reason: 'Soxta QR' })).status).toBe(200);
+    expect(await bonus()).toBe(1);
+    // Hammasi bekor — bonus ham qaytadi
+    expect((await post(`/vouchers/${second.id}/revoke`, { reason: 'Soxta QR' })).status).toBe(200);
+    expect(await bonus()).toBe(0);
+    // Bittasi tiklansa — bonus qaytadi
+    expect((await post(`/vouchers/${first.id}/restore`)).status).toBe(200);
+    expect(await bonus()).toBe(1);
+    expect((await post(`/vouchers/${second.id}/restore`)).status).toBe(200);
+  });
+
   it('havolasiz kelgan, xodim do\'st va xodim taklif qiluvchi — bonus yo\'q', async () => {
     await register(3); // havolasiz
     await scan(3);
