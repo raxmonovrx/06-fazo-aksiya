@@ -45,6 +45,7 @@ const dt = (iso: string) =>
 export function ticketHtml(v: PrintableVoucher, paper: PaperWidth): string {
   const width = paper === 80 ? 72 : 48; // chop etiladigan kenglik (mm)
   const qr = paper === 80 ? 52 : 40;
+  // Logo balandligi chegarasi; eni — chekning to'liq kengligigacha (uzun logolar ham katta chiqadi)
   const logo = paper === 80 ? 26 : 20;
   const t = v.texts ?? DEFAULT_RECEIPT_TEXTS;
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(t.title || 'Chek')} #${v.id}</title><style>
@@ -52,7 +53,7 @@ export function ticketHtml(v: PrintableVoucher, paper: PaperWidth): string {
 * { box-sizing: border-box; }
 body { margin: 0; width: ${paper}mm; font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; color: #000; }
 .t { width: ${width}mm; margin: 0 auto; padding: 4mm 0 6mm; text-align: center; }
-.logo { display: block; width: ${logo}mm; height: ${logo}mm; object-fit: contain; margin: 0 auto 2mm; }
+.logo { display: block; width: auto; height: auto; max-width: 100%; max-height: ${logo}mm; margin: 0 auto 2.5mm; }
 .brand { font-size: ${paper === 80 ? 18 : 15}px; font-weight: 800; letter-spacing: .5px; }
 .sub { font-size: 11px; margin-top: 1mm; }
 .hr { border-top: 1px dashed #000; margin: 3mm 0; }

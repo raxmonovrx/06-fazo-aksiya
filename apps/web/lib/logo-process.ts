@@ -4,14 +4,15 @@
  * Chek logosi: istalgan rasmni termoprinter uchun toza oq-qora PNG ga aylantiradi.
  * Hammasi brauzerda (canvas) — server faqat tayyor natijani saqlaydi.
  *
- * 1. Asl rasm oq fonga qo'yiladi (shaffof PNG ham), ko'pi bilan 800px — qayta sozlash uchun saqlanadi.
+ * 1. Asl rasm oq fonga qo'yiladi (shaffof PNG ham), ko'pi bilan 1400px — qayta sozlash uchun saqlanadi.
  * 2. Kulrangga o'tkaziladi, chegara (threshold) Otsu usuli bilan avtomatik tanlanadi.
  * 3. To'q fonli logo (masalan qora fonda oq yozuv) o'zi aniqlanadi — ranglar almashtiriladi.
- * 4. Bo'sh oq chetlar kesiladi, natija ko'pi bilan 480px, faqat 2 rang.
+ * 4. Bo'sh oq chetlar kesiladi, natija ko'pi bilan 1000px, faqat 2 rang.
  */
 
-const ORIGINAL_MAX = 800;
-const PRINT_MAX = 480;
+// 80 mm chek: 72 mm = 576 nuqta (203 dpi) — uzun logo to'liq kenglikda ham tiniq chiqsin
+const ORIGINAL_MAX = 1400;
+const PRINT_MAX = 1000;
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -29,7 +30,7 @@ function canvas(w: number, h: number) {
   return { c, ctx: c.getContext('2d', { willReadFrequently: true })! };
 }
 
-/** Yuklangan fayl → asl rasm (oq fon, ≤800px, JPEG data URL) */
+/** Yuklangan fayl → asl rasm (oq fon, ≤1400px, JPEG data URL) */
 export async function prepareOriginal(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('Faqat rasm fayli (PNG, JPG, SVG, WEBP)');
   const url = URL.createObjectURL(file);
@@ -128,7 +129,7 @@ export function toPrint(img: HTMLImageElement, threshold: number, invert: boolea
   }
   if (x1 < 0) return null;
 
-  // Kesilgan qism + kichik bo'sh joy, ko'pi bilan 480px
+  // Kesilgan qism + kichik bo'sh joy, ko'pi bilan 1000px
   const pad = Math.round(Math.max(x1 - x0, y1 - y0) * 0.03);
   const sx = Math.max(0, x0 - pad) / k;
   const sy = Math.max(0, y0 - pad) / k;
