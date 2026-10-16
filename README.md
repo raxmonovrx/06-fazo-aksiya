@@ -6,7 +6,6 @@ Kassir admin panelning **Kassa** sahifasida chek summasini kiritadi va bir marta
 - Mini app: `https://promo.fazorestaurant.uz/miniapp`
 - Admin panel: `https://panel.fazorestaurant.uz/admin`
 - Qoidalar: `https://promo.fazorestaurant.uz/rules`
-- Eski `club.fazorestaurant.uz` yangi manzillarga yo'naltiriladi
 
 Texnik topshiriq [SPEC.md](SPEC.md) da. Infratuzilma konteksti [FAZO_AKSIYA_CONTEXT.md](FAZO_AKSIYA_CONTEXT.md) da.
 
@@ -111,7 +110,7 @@ Bir martalik tayyorlov:
 3. HTTPS sertifikat oling:
 
    ```bash
-   sudo certbot --nginx -d promo.fazorestaurant.uz -d panel.fazorestaurant.uz -d club.fazorestaurant.uz
+   sudo certbot --nginx -d promo.fazorestaurant.uz -d panel.fazorestaurant.uz
    ```
 
 Har safar deploy qilish:
